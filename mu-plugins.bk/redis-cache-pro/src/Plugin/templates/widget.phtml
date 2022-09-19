@@ -1,0 +1,234 @@
+<?php
+
+$license = $this->license();
+$diagnostics = $this->diagnostics();
+
+$usingRelay = $diagnostics->usingRelay();
+
+$status = $diagnostics['general']['status']->html;
+$dropin = $diagnostics['general']['dropin']->html;
+$evictionPolicy = $diagnostics['general']['eviction-policy'];
+
+$redisKeys = $diagnostics['statistics']['redis-keys'];
+$redisMemory = $diagnostics['statistics']['redis-memory'];
+
+$relayKeys = $diagnostics['statistics']['relay-keys'] ?? false;
+$relayMemory = $diagnostics['statistics']['relay-memory'] ?? false;
+
+$configError = $this->config->initException ?? false;
+$configDefined = defined('\WP_REDIS_CONFIG');
+$configDefinedTooLate = $this->lazyAssConfig();
+$isDisabled = $diagnostics->isDisabled();
+$dropinExists = $diagnostics->dropinExists();
+$dropinIsValid = $dropinExists && $diagnostics->dropinIsValid();
+$dropinIsUpToDate = $dropinExists && $diagnostics->dropinIsUpToDate();
+$fileModsAllowed = wp_is_file_mod_allowed('object_cache_dropin');
+
+$admin_url = function ($path) {
+    $callback = is_network_admin() ? 'network_admin_url' : 'admin_url';
+
+    return $callback($path);
+};
+
+?>
+
+<div class="objectcache:widget">
+
+    <ul>
+        <li>
+            <span class="dashicons dashicons-cloud"></span>
+            Status: <?php echo $status; ?>
+        </li>
+
+        <li>
+            <span class="dashicons dashicons-admin-plugins"></span>
+            Drop-in: <?php echo $dropin; ?>
+        </li>
+
+        <?php if (! $license->isValid()) : ?>
+            <li>
+                <span class="dashicons dashicons-admin-network"></span>
+                License:
+                <data class="error">
+                    <?php if (! $this->token()) : ?>
+                        Missing token
+                    <?php else : ?>
+                        <?php echo ucwords($license->state() ?? 'error'); ?>
+                    <?php endif; ?>
+                </data>
+            </li>
+        <?php endif; ?>
+
+        <?php if ($evictionPolicy->hasValue() && $evictionPolicy->hasIssue()) : ?>
+            <li>
+                <span class="dashicons dashicons-screenoptions"></span>
+                Eviction: <?php echo $evictionPolicy->html; ?>
+            </li>
+        <?php endif; ?>
+
+        <?php if ($this->config->shared && $redisKeys->hasValue()) : ?>
+            <li>
+                <span class="dashicons dashicons-database"></span>
+                Cache: <?php echo number_format($redisKeys->value); ?>
+                <?php echo _n('object', 'objects', $redisKeys->value) ?>
+            </li>
+        <?php elseif ($redisMemory->hasValue()): ?>
+            <li>
+                <span class="dashicons dashicons-database"></span>
+                Cache: <?php echo $redisMemory->html; ?>
+            </li>
+        <?php endif; ?>
+
+        <?php if ($usingRelay) : ?>
+            <?php if ($this->config->shared && $relayKeys->hasValue()) : ?>
+                <li>
+                    <span class="dashicons dashicons-database-import"></span>
+                    Relay: <?php echo number_format($relayKeys->value); ?>
+                    <?php echo _n('object', 'objects', $relayKeys->value) ?>
+                </li>
+            <?php elseif ($relayMemory->hasValue()): ?>
+                <li>
+                    <span class="dashicons dashicons-database-import"></span>
+                    Relay: <?php echo $relayMemory->html; ?>
+                </li>
+            <?php endif; ?>
+        <?php endif; ?>
+    </ul>
+
+    <div class="actions">
+
+        <?php if (! $isDisabled && $dropinExists && $dropinIsValid && $diagnostics->ping()) : ?>
+            <?php if ($license->isValid()) : ?>
+                <a class="button button-primary"
+                    href="<?php echo wp_nonce_url($admin_url(add_query_arg('objectcache-action', 'flush-cache', 'index.php')), 'flush-cache'); ?>"
+                >
+                    Flush Cache
+                </a>
+            <?php else : ?>
+                <a class="button button-primary" href="#!" disabled>
+                    Flush Cache
+                </a>
+            <?php endif; ?>
+        <?php endif; ?>
+
+        <?php if ($fileModsAllowed && (! is_multisite() || is_network_admin())) : ?>
+
+            <?php if (! $dropinExists || ! $dropinIsValid) : ?>
+                <?php if ($configDefined && ! $configDefinedTooLate && $license->isValid()) : ?>
+                    <a class="button button-primary"
+                        href="<?php echo wp_nonce_url($admin_url(add_query_arg('objectcache-action', 'enable-dropin', 'index.php')), 'enable-dropin'); ?>"
+                    >
+                        Enable Cache
+                    </a>
+                <?php else : ?>
+                    <a class="button button-primary" href="#!" disabled>
+                        Enable Cache
+                    </a>
+                <?php endif; ?>
+            <?php elseif ($dropinIsValid && ! $dropinIsUpToDate) : ?>
+                <a class="button button-secondary"
+                    href="<?php echo wp_nonce_url($admin_url(add_query_arg('objectcache-action', 'update-dropin', 'index.php')), 'update-dropin'); ?>"
+                >
+                    Update Drop-in
+                </a>
+            <?php endif; ?>
+
+            <?php if ($dropinExists && $dropinIsValid && ! $isDisabled) : ?>
+                <a class="button button-secondary button-ml-auto"
+                    onclick="return confirm('Are you sure you want to disable the object cache?')"
+                    href="<?php echo wp_nonce_url($admin_url(add_query_arg('objectcache-action', 'disable-dropin', 'index.php')), 'disable-dropin'); ?>"
+                >
+                    Disable
+                </a>
+            <?php endif; ?>
+
+        <?php endif; ?>
+
+    </div>
+
+</div>
+
+<?php if ($isDisabled) : ?>
+
+    <div class="objectcache:widget-sub">
+
+        <?php if ($diagnostics->isDisabledUsingConstant()) : ?>
+
+            <p>
+                The object cache is disabled using the <code>WP_REDIS_DISABLED</code> constant.
+            </p>
+
+        <?php elseif ($diagnostics->isDisabledUsingEnvVar()) : ?>
+
+            <p>
+                The object cache is currently disabled using the <code>WP_REDIS_DISABLED</code> environment variable.
+            </p>
+
+        <?php endif; ?>
+
+    </div>
+
+<?php elseif (! $configDefined) : ?>
+
+    <div class="objectcache:widget-sub">
+        <p>
+            To enable the object cache, set up the <code>WP_REDIS_CONFIG</code> constant.
+        </p>
+    </div>
+
+<?php elseif ($configDefined && $configDefinedTooLate) : ?>
+
+    <div class="objectcache:widget-sub">
+        <p>
+            The <code>WP_REDIS_CONFIG</code> constant was defined too late. Try moving it to the top of the configuration file.
+        </p>
+    </div>
+
+<?php elseif ($configError) : ?>
+
+    <div class="objectcache:widget-sub">
+        <p>
+            An error occurred during the instantiation of the configuration:
+        </p>
+        <ul>
+            <li><code><?php echo esc_html($configError->getMessage()); ?></code></li>
+        </ul>
+    </div>
+
+<?php elseif (! empty($wp_object_cache_errors)) : ?>
+
+    <div class="objectcache:widget-sub">
+
+        <p>
+            <?php if (count($wp_object_cache_errors) > 1) : ?>
+                <?php echo count($wp_object_cache_errors); ?> object cache errors have occurred:
+            <?php else : ?>
+                An object cache error has occurred:
+            <?php endif; ?>
+        </p>
+
+        <ul>
+            <?php foreach (array_slice($wp_object_cache_errors, 0, 3) as $error) : ?>
+                <li><code><?php echo esc_html($error); ?></code></li>
+            <?php endforeach; ?>
+        </ul>
+
+    </div>
+
+<?php elseif (! $this->token()) : ?>
+
+    <div class="objectcache:widget-sub">
+        <p>
+            Automatic updates for Object Cache Pro are disabled, because no license token is set.
+        </p>
+    </div>
+
+<?php elseif (! $license->isValid()) : ?>
+
+    <div class="objectcache:widget-sub">
+        <p>
+            Automatic updates for Object Cache Pro are disabled, because the license token is not valid.
+        </p>
+    </div>
+
+<?php endif; ?>

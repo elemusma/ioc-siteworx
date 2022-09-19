@@ -1,0 +1,41 @@
+<?php return array(
+    'root' => array(
+        'pretty_version' => 'dev-develop',
+        'version' => 'dev-develop',
+        'type' => 'library',
+        'install_path' => __DIR__ . '/../../',
+        'aliases' => array(),
+        'reference' => '08139a2bec46dc9b8e34734e05a4439c6f1e1b0e',
+        'name' => '__root__',
+        'dev' => true,
+    ),
+    'versions' => array(
+        '__root__' => array(
+            'pretty_version' => 'dev-develop',
+            'version' => 'dev-develop',
+            'type' => 'library',
+            'install_path' => __DIR__ . '/../../',
+            'aliases' => array(),
+            'reference' => '08139a2bec46dc9b8e34734e05a4439c6f1e1b0e',
+            'dev_requirement' => false,
+        ),
+        'publishpress/publishpress-instance-protection' => array(
+            'pretty_version' => 'v1.0.2',
+            'version' => '1.0.2.0',
+            'type' => 'library',
+            'install_path' => __DIR__ . '/../publishpress/publishpress-instance-protection',
+            'aliases' => array(),
+            'reference' => 'ef1a631a41b723ce2e856f534ff4befbe914e964',
+            'dev_requirement' => false,
+        ),
+        'publishpress/wordpress-reviews' => array(
+            'pretty_version' => 'v1.1.19',
+            'version' => '1.1.19.0',
+            'type' => 'library',
+            'install_path' => __DIR__ . '/../publishpress/wordpress-reviews',
+            'aliases' => array(),
+            'reference' => '028e573eb7c5da2455a7a823cabbbe5e3f89ca9c',
+            'dev_requirement' => false,
+        ),
+    ),
+);

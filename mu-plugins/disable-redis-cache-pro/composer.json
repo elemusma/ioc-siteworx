@@ -1,0 +1,60 @@
+{
+    "name": "rhubarbgroup/object-cache-pro",
+    "description": "A business class Redis object cache backend for WordPress.",
+    "homepage": "https://objectcache.pro",
+    "type": "wordpress-plugin",
+    "license": "proprietary",
+    "authors": [
+        {
+            "name": "Till Krüss",
+            "homepage": "https://till.im/"
+        }
+    ],
+    "require": {
+        "php": "^7.0 || ^8.0",
+        "ext-redis": "^3.1.1 || ^4.0 || ^5.0",
+        "composer/installers": "~1.0 || ~2.0"
+    },
+    "require-dev": {
+        "dms/phpunit-arraysubset-asserts": "^0.3.0",
+        "fabpot/goutte": "^v4.0",
+        "friendsofphp/php-cs-fixer": "^v3.1",
+        "mockery/mockery": "^1.2",
+        "phpbench/phpbench": "^0.16 || ^1.0",
+        "phpunit/phpunit": "^7.0 || ^8.0 || ^9.0",
+        "squizlabs/php_codesniffer": "^3.5",
+        "szepeviktor/phpstan-wordpress": "^0.7.1",
+        "wp-cli/wp-cli-bundle": "^2.3"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "RedisCachePro\\": "src/",
+            "Tests\\": "tests/"
+        },
+        "classmap": [
+            "src/Extensions/Debugbar/Panel.php",
+            "src/Extensions/Debugbar/Insights.php"
+        ]
+    },
+    "suggest": {
+        "ext-relay": "Required to use Relay as the object cache backend."
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
+        "sort-packages": true
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "scripts": {
+        "test": "vendor/bin/phpunit --testdox",
+        "test:unit": "vendor/bin/phpunit --testdox --testsuite Unit --exclude Relay",
+        "test:http": "vendor/bin/phpunit --testdox --testsuite Feature",
+        "coverage:unit": "vendor/bin/phpunit --testsuite Unit  --exclude Relay --coverage-clover=coverage.xml",
+        "coverage:http": "vendor/bin/phpunit --testsuite Feature --coverage-clover=coverage.xml",
+        "style": "vendor/bin/php-cs-fixer fix --verbose --dry-run",
+        "style:fix": "vendor/bin/php-cs-fixer fix --verbose",
+        "lint": "vendor/bin/phpcs --no-cache --ignore=vendor --extensions=php --standard=PSR12 .",
+        "analyze": "vendor/bin/phpstan analyze"
+    }
+}
