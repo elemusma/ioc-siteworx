@@ -1177,6 +1177,22 @@ class Breeze_Configuration {
 		exit;
 	}
 
+	/**
+	 * Ajax purge Object Cache
+	 *
+	 * @return void
+	 */
+	public static function breeze_ajax_purge_opcache() {
+		breeze_is_restricted_access();
+
+		//check security
+		check_ajax_referer( '_breeze_purge_opcache', 'security' );
+
+		echo wp_json_encode( array( 'clear' => Breeze_PurgeCache::__flush_object_cache() ) );
+		exit;
+	}
+
+
 	/*
 	 * Ajax purge database
 	 */

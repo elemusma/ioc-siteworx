@@ -183,19 +183,23 @@ class Breeze_Admin {
 		}
 
 		$token_name = array(
-			'breeze_purge_varnish'  => '',
-			'breeze_purge_database' => '',
-			'breeze_purge_cache'    => '',
-			'breeze_save_options'   => '',
+			'breeze_purge_varnish'   => '',
+			'breeze_purge_database'  => '',
+			'breeze_purge_cache'     => '',
+			'breeze_save_options'    => '',
+			'breeze_purge_opcache'   => '',
+			'breeze_import_settings' => '',
 		);
 
 		// Only create the security nonce if the user has manage_options ( administrator capabilities ).
 		if ( false === breeze_is_restricted_access( true ) ) {
 			$token_name = array(
-				'breeze_purge_varnish'  => wp_create_nonce( '_breeze_purge_varnish' ),
-				'breeze_purge_database' => wp_create_nonce( '_breeze_purge_database' ),
-				'breeze_purge_cache'    => wp_create_nonce( '_breeze_purge_cache' ),
-				'breeze_save_options'   => wp_create_nonce( '_breeze_save_options' ),
+				'breeze_purge_varnish'   => wp_create_nonce( '_breeze_purge_varnish' ),
+				'breeze_purge_database'  => wp_create_nonce( '_breeze_purge_database' ),
+				'breeze_purge_cache'     => wp_create_nonce( '_breeze_purge_cache' ),
+				'breeze_save_options'    => wp_create_nonce( '_breeze_save_options' ),
+				'breeze_purge_opcache'   => wp_create_nonce( '_breeze_purge_opcache' ),
+				'breeze_import_settings' => wp_create_nonce( '_breeze_import_settings' ),
 			);
 		}
 
@@ -296,6 +300,14 @@ class Breeze_Admin {
 		);
 		$wp_admin_bar->add_node( $args );
 
+		// add child item (Purge Modules)
+		$args = array(
+			'id'     => 'breeze-purge-object-cache-group',
+			'title'  => esc_html__( 'Purge Object Cache', 'breeze' ),
+			'parent' => 'breeze-purge-modules',
+		);
+		$wp_admin_bar->add_node( $args );
+
 		// add settings item
 		$args = array(
 			'id'     => 'breeze-settings',
@@ -343,6 +355,7 @@ class Breeze_Admin {
 		add_action( 'wp_ajax_breeze_purge_varnish', array( 'Breeze_Configuration', 'purge_varnish_action' ) );
 		add_action( 'wp_ajax_breeze_purge_file', array( 'Breeze_Configuration', 'breeze_ajax_clean_cache' ) );
 		add_action( 'wp_ajax_breeze_purge_database', array( 'Breeze_Configuration', 'breeze_ajax_purge_database' ) );
+		add_action( 'wp_ajax_breeze_purge_opcache', array( 'Breeze_Configuration', 'breeze_ajax_purge_opcache' ) );
 	}
 
 	/*
@@ -864,6 +877,7 @@ class Breeze_Admin {
 		Breeze_PurgeCache::breeze_cache_flush( $flush_cache );
 		//clear varnish cache
 		$this->breeze_clear_varnish();
+		Breeze_PurgeCache::__flush_object_cache();
 	}
 
 	/**

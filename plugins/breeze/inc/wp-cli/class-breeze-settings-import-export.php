@@ -22,6 +22,9 @@ class Breeze_Settings_Import_Export {
 	 * @access public
 	 */
 	public function import_json_settings() {
+		breeze_is_restricted_access();
+		check_ajax_referer( '_breeze_import_settings', 'security' );
+
 		if ( ! current_user_can( 'administrator' ) ) {
 			wp_send_json_error( new WP_Error( 'authority_issue', __( 'Only administrator can import settings', 'breeze' ) ) );
 

@@ -40,6 +40,15 @@ jQuery( document ).ready(
 				breeze_purgeVarnish_callAjax();
 			}
 		);
+		// Topbar action
+		$( document ).on(
+			'click',
+			'#wp-admin-bar-breeze-purge-object-cache-group',
+			function ( e ) {
+				e.preventDefault();
+				breeze_purge_opcache_ajax();
+			}
+		);
 
 		$( document ).on(
 			'click',
@@ -66,6 +75,42 @@ jQuery( document ).ready(
 
 			}
 		);
+
+		//clear cache by button
+		function breeze_purge_opcache_ajax() {
+			$.ajax(
+				{
+					url: ajaxurl,
+					dataType: 'json',
+					method: 'POST',
+					data: {
+						action: 'breeze_purge_opcache',
+						is_network: $( 'body' ).hasClass( 'network-admin' ),
+						security: breeze_token_name.breeze_purge_opcache
+					},
+					success: function ( res ) {
+						current = location.href;
+						if ( res.clear ) {
+							var div = '<div id="message" class="notice notice-success is-dismissible breeze-notice" style="margin-top:10px; margin-bottom:10px;padding: 10px;margin-left: 0;"><p><strong>Object Cache has been purged.</strong></p><button type="button" class="notice-dismiss"><span class="screen-reader-text">Dismiss this notice.</span></button></div>';
+							//backend
+							$( "#wpbody #wpbody-content" ).prepend( div );
+							setTimeout(
+								function () {
+									//location.reload();
+									purge_action = true;
+								},
+								2000
+							);
+
+						} else {
+							window.location.href = current + "breeze-msg=purge-fail";
+							purge_action         = true;
+							location.reload();
+						}
+					}
+				}
+			);
+		}
 
 		//clear cache by button
 		function breeze_purgeVarnish_callAjax() {
@@ -533,17 +578,17 @@ jQuery( document ).ready(
 		);
 
 		// Cookie do
-		function setTabFromCookie() {
-			active_tab = getCookie( 'breeze_active_tab' );
-			if ( ! active_tab ) {
-				active_tab = 'basic';
+		function Breeze_setTabFromCookie() {
+			var breeze_active_tab = getCookie( 'breeze_active_tab' );
+			if ( ! breeze_active_tab ) {
+				breeze_active_tab = 'basic';
 			}
 
-			if ('import_export' === active_tab) {
-				active_tab = 'basic';
+			if ('import_export' === breeze_active_tab) {
+				breeze_active_tab = 'basic';
 			}
 
-			if ( $( "#tab-" + active_tab ).length === 0 ) { // Tab not found (multisite case)
+			if ( $( "#tab-" + breeze_active_tab ).length === 0 ) { // Tab not found (multisite case)
 				firstTab = $( '#breeze-tabs' ).find( 'a:first-child' );
 				if (firstTab.length) {
 					tabType = firstTab.attr( 'id' ).replace( 'tab-', '' );
@@ -551,12 +596,12 @@ jQuery( document ).ready(
 					$( "#tab-content-" + tabType ).addClass( 'active' );
 				}
 			} else {
-				$( "#tab-" + active_tab ).addClass( 'active' );
-				$( "#tab-content-" + active_tab ).addClass( 'active' );
+				$( "#tab-" + breeze_active_tab ).addClass( 'active' );
+				$( "#tab-content-" + breeze_active_tab ).addClass( 'active' );
 			}
 
 			// Toggle right-side content
-			if ( active_tab === 'faq' ) {
+			if ( breeze_active_tab === 'faq' ) {
 				$( '#breeze-and-cloudways' ).hide();
 				if ( $( '#faq-content' ).length ) {
 					$( '#faq-content' ).accordion(
@@ -588,7 +633,7 @@ jQuery( document ).ready(
 			return "";
 		}
 
-		setTabFromCookie();
+		Breeze_setTabFromCookie();
 
 		// Sub-site settings toggle.
 		var global_tabs                          = [
@@ -744,14 +789,15 @@ jQuery( document ).ready(
 			'#breeze_import_btn',
 			function () {
 				if ( true === $valid_json ) {
-					network      = $( '#breeze-level' ).val();
+					var network      = $( '#breeze-level' ).val();
 					var the_file = $( '#breeze_import_settings' ).get( 0 ).files[ 0 ];
 
 					var breeze_data = new FormData();
 					breeze_data.append( 'action', 'breeze_import_json' );
 					breeze_data.append( 'network_level', network );
 					breeze_data.append( 'breeze_import_file', the_file );
-
+					breeze_data.append( 'security', breeze_token_name.breeze_import_settings );
+ 
 					var filename_holder = $( '#file-selected' );
 					var filename_error  = $( '#file-error' );
 					var import_settings = '<div class="br-loader-spinner import_settings"><div></div><div></div><div></div><div></div></div>';

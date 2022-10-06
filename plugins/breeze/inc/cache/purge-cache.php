@@ -140,7 +140,10 @@ class Breeze_PurgeCache {
 		}
 
 		if ( function_exists( 'wp_cache_flush' ) && true === $flush_cache ) {
-			wp_cache_flush();
+			#if ( ! defined( 'RedisCachePro\Version' ) && ! defined( 'WP_REDIS_VERSION' ) ) {
+				wp_cache_flush();
+			#}
+
 		}
 	}
 
@@ -181,6 +184,18 @@ class Breeze_PurgeCache {
 		}
 
 		return $instance;
+	}
+
+
+	public static function __flush_object_cache() {
+		set_as_network_screen();
+
+		if ( is_network_admin() ) {
+			// in case we need to add something specific for network.
+			return wp_cache_flush();
+		}
+
+		return wp_cache_flush();
 	}
 
 }

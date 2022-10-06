@@ -2,6 +2,7 @@
 /*
  *  Based on some work of https://github.com/tlovett1/simple-cache/blob/master/inc/dropins/file-based-page-cache.php
  */
+namespace Breeze_Cache_Init;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	header( 'Status: 403 Forbidden' );
@@ -152,7 +153,7 @@ $current_url   = $domain . rawurldecode( $_SERVER['REQUEST_URI'] );
 $opts_config   = $GLOBALS['breeze_config'];
 $check_exclude = check_exclude_page( $opts_config, $current_url );
 
-$query_instance         = Breeze_Query_Strings_Rules::get_instance();
+$query_instance         = \Breeze_Query_Strings_Rules::get_instance();
 $breeze_query_vars_list = $query_instance->check_query_var_group( $current_url );
 
 if ( false === $check_exclude && 0 !== (int) $breeze_query_vars_list['extra_query_no'] ) {
@@ -188,7 +189,7 @@ if ( ! $check_exclude ) {
 	}
 
 	breeze_serve_cache( $filename, $url_path, $X1, $devices );
-	ob_start( 'breeze_cache' );
+	\ob_start( 'Breeze_Cache_Init\breeze_cache' );
 } else {
 	header( 'Cache-Control: no-cache' );
 }
@@ -262,24 +263,6 @@ function breeze_cache( $buffer, $flags ) {
 		),
 	);
 
-	if ( ! isset( $_SERVER['HTTP_X_VARNISH'] ) ) {
-		$headers = array_merge(
-			array(
-				array(
-					'name'  => 'Expires',
-					'value' => 'Wed, 17 Aug 2005 00:00:00 GMT',
-				),
-				array(
-					'name'  => 'Cache-Control',
-					'value' => 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0',
-				),
-				array(
-					'name'  => 'Pragma',
-					'value' => 'no-cache',
-				),
-			)
-		);
-	}
 
 	// Lazy load implementation
 	if ( class_exists( 'Breeze_Lazy_Load' ) ) {
@@ -295,7 +278,7 @@ function breeze_cache( $buffer, $flags ) {
 			$is_lazy_load_enabled = filter_var( $GLOBALS['breeze_config']['enabled-lazy-load'], FILTER_VALIDATE_BOOLEAN );
 			$is_lazy_load_native  = filter_var( $GLOBALS['breeze_config']['use-lazy-load-native'], FILTER_VALIDATE_BOOLEAN );
 
-			$lazy_load = new Breeze_Lazy_Load( $buffer, $is_lazy_load_enabled, $is_lazy_load_native );
+			$lazy_load = new \Breeze_Lazy_Load( $buffer, $is_lazy_load_enabled, $is_lazy_load_native );
 			$buffer    = $lazy_load->apply_lazy_load_feature();
 		}
 
@@ -319,7 +302,7 @@ function breeze_cache( $buffer, $flags ) {
 					false !== strpos( $html_a_tag, '_blank' )
 				) {
 					try {
-						$anchor_attributed = new SimpleXMLElement( $html_a_tag );
+						$anchor_attributed = new \SimpleXMLElement( $html_a_tag );
 						// Only apply on valid URLS.
 						if (
 							! empty( $anchor_attributed ) &&
@@ -420,7 +403,11 @@ function breeze_cache( $buffer, $flags ) {
 		if ( in_array( $ini_output_compression, $array_values ) ) {
 			return $buffer;
 		} else {
-			return ob_gzhandler( $buffer, $flags );
+			if(defined('RedisCachePro\Version')){
+				return $buffer;
+			}else{
+				return ob_gzhandler( $buffer, $flags );
+			}
 		}
 	} else {
 		return $buffer;
@@ -440,7 +427,7 @@ function breeze_get_url_path() {
 
 	$the_url = $domain . rtrim( $host, '/' ) . $_SERVER['REQUEST_URI'];
 
-	$query_instance         = Breeze_Query_Strings_Rules::get_instance();
+	$query_instance         = \Breeze_Query_Strings_Rules::get_instance();
 	$breeze_query_vars_list = $query_instance->check_query_var_group( $the_url );
 	if ( 0 !== (int) $breeze_query_vars_list['ignored_no'] ) {
 		$the_url = $query_instance->rebuild_url( $the_url, $breeze_query_vars_list );

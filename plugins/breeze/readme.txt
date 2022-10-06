@@ -1,9 +1,9 @@
 === Breeze - WordPress Cache Plugin ===
 Contributors: Cloudways
 Tags: cache,caching, performance, wp-cache, cdn, combine, compress, speed plugin, database cache,gzip, http compression, js cache, minify, optimize, page cache, performance, speed, expire headers
-Requires at least: 4.5
+Requires at least: 5.9
 Tested up to: 6.0
-Stable tag: 2.0.7
+Stable tag: 2.0.9
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -25,7 +25,6 @@ What makes Breeze WordPress Cache Plugin awesome is that it comes with builtin s
 
 **Support:** We love to provide support! Post your questions on the WordPress.org support forums, or if you are a Cloudways Customer you may ask questions on the <a href="https://community.cloudways.com/">Cloudways Community Forum</a>.
 
-**Special Thanks:** We would like to give special mention to WP Speed Of Light for being an inspiration for Breeze.
 
 == Installation ==
 
@@ -144,6 +143,18 @@ Yes. The process of setting up CloudFlare with Breeze is easy. Check out the fol
 Using Gzip, Breeze compresses the request files, further reducing the size of the download files and speeding up the user experience.
 
 == Changelog ==
+
+= 2.0.9=
+
+* Fix: Added nonce check to import settings ajax request, in order to improve security and prevent cross-site requests.
+
+= 2.0.8=
+
+* Fix: Enhance compatibility with the Pickingpal plugin to load the orders.
+* Fix: Remove duplication header calls in Varnish requests.
+* Fix: Invalid Certificate never accepted and its default value is TRUE now.
+* Add: Include the option to Clear Object Cache.
+
 
 = 2.0.7 =
 
@@ -402,4 +413,4 @@ Update Breeze through WordPress Admin > Dashboard >Updates. The settings will re
 
 == Requirements ==
 
-PHP 7.x ,PHP 7.4 recommended for better performance, WordPress 4.5+
+PHP 7.x ,PHP 7.4, PHP 8 recommended for better performance, WordPress 5.9+

@@ -417,6 +417,16 @@ function is_varnish_cache_started( $retry = 1, $time_fresh = 0, $use_headers = f
 	$url_ping = trim( home_url() . '?breeze_check_cache_available=' . $time_fresh );
 
 	if ( true === $use_headers ) {
+
+		$ssl_verification = apply_filters( 'breeze_ssl_check_certificate', true );
+
+		if ( ! is_bool( $ssl_verification ) ) {
+			$ssl_verification = true;
+		}
+
+		if ( defined( 'WP_DEBUG' ) && true === WP_DEBUG ) {
+			$ssl_verification = false;
+		}
 		// Making sure the request is only for HEADER info without getting the content from the page
 		$context_options = array(
 			'http' => array(
@@ -424,7 +434,7 @@ function is_varnish_cache_started( $retry = 1, $time_fresh = 0, $use_headers = f
 				'follow_location' => 1,
 			),
 			'ssl'  => array(
-				'verify_peer' => false,
+				'verify_peer' => $ssl_verification,
 			),
 		);
 
@@ -491,13 +501,23 @@ function is_varnish_cache_started( $retry = 1, $time_fresh = 0, $use_headers = f
  * @return array|bool
  */
 function breeze_get_headers_via_curl( $url_ping = '' ) {
+
+	$ssl_verification = apply_filters( 'breeze_ssl_check_certificate', true );
+	if ( ! is_bool( $ssl_verification ) ) {
+		$ssl_verification = true;
+	}
+
+	if ( defined( 'WP_DEBUG' ) && true === WP_DEBUG ) {
+		$ssl_verification = false;
+	}
+
 	$connection = curl_init();
 	$headers    = array();
 	curl_setopt( $connection, CURLOPT_URL, $url_ping );
 	curl_setopt( $connection, CURLOPT_NOBODY, true );
 	curl_setopt( $connection, CURLOPT_RETURNTRANSFER, true );
 	curl_setopt( $connection, CURLOPT_FOLLOWLOCATION, true ); // follow redirects
-	curl_setopt( $connection, CURLOPT_SSL_VERIFYPEER, false ); // if the SSL is invalid, curl will have trouble giving the correct response.
+	curl_setopt( $connection, CURLOPT_SSL_VERIFYPEER, $ssl_verification );
 	curl_setopt( $connection, CURLOPT_HEADER, true );// return just headers
 	curl_setopt( $connection, CURLOPT_TIMEOUT, 1 );
 	// this function is called by curl for each header received
@@ -717,13 +737,25 @@ function breeze_varnish_purge_cache( $url = '', $purge_varnish = false, $check_v
 	if ( ! empty( $parse_url['query'] ) && 'breeze' !== strtolower( $parse_url['query'] ) ) {
 		$purgeme .= '?' . $parse_url['query'];
 	}
+
+
+	$ssl_verification = apply_filters( 'breeze_ssl_check_certificate', true );
+
+	if ( ! is_bool( $ssl_verification ) ) {
+		$ssl_verification = true;
+	}
+
+	if ( defined( 'WP_DEBUG' ) && true === WP_DEBUG ) {
+		$ssl_verification = false;
+	}
+
 	$request_args = array(
 		'method'    => $purge_method,
 		'headers'   => array(
 			'Host'       => $host,
 			'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36',
 		),
-		'sslverify' => false,
+		'sslverify' => $ssl_verification,
 	);
 	$response     = wp_remote_request( $schema . $purgeme, $request_args );
 	if ( is_wp_error( $response ) || 200 !== (int) $response['response']['code'] ) {
@@ -960,10 +992,10 @@ function breeze_migrate_old_settings( $is_sigle = true, $subsite_id = 0, $is_roo
 		'breeze-exclude-js'         => ( isset( $options['breeze-exclude-js'] ) ? $options['breeze-exclude-js'] : array() ),
 		'breeze-move-to-footer-js'  => ( isset( $options['breeze-move-to-footer-js'] ) ? $options['breeze-move-to-footer-js'] : array() ),
 		'breeze-defer-js'           => ( isset( $options['breeze-defer-js'] ) ? $options['breeze-defer-js'] : array() ),
-		'breeze-delay-all-js'    => ( isset( $options['breeze-delay-all-js'] ) ? $options['breeze-delay-all-js'] : '0' ),
+		'breeze-delay-all-js'       => ( isset( $options['breeze-delay-all-js'] ) ? $options['breeze-delay-all-js'] : '0' ),
 		'breeze-enable-js-delay'    => ( isset( $options['breeze-enable-js-delay'] ) ? $options['breeze-enable-js-delay'] : '0' ),
 		'breeze-delay-js-scripts'   => ( isset( $options['breeze-delay-js-scripts'] ) ? $options['breeze-delay-js-scripts'] : array() ),
-		'no-breeze-no-delay-js'   => ( isset( $options['no-breeze-no-delay-js'] ) ? $options['no-breeze-no-delay-js'] : array() ),
+		'no-breeze-no-delay-js'     => ( isset( $options['no-breeze-no-delay-js'] ) ? $options['no-breeze-no-delay-js'] : array() ),
 
 	);
 
