@@ -41,12 +41,14 @@ require_once dirname( __FILE__ ) . '/logger.php';
 
 		public function run() {
 			$mcConf = $this->parseFile($this->mcConfFile);
-			$mcIPsConf = $this->parseFile($this->mcIPsFile);
-			$mcRuleSet = $this->parseFile($this->mcRulesFile);
 
-			if (!array_key_exists('time', $mcConf) || !isset($mcConf['time']) || !($mcConf['time'] > time() - (48*3600))) {
+			if (!array_key_exists('time', $mcConf) || !isset($mcConf['time']) || !($mcConf['time'] > time() - (48*3600)) ||
+					!isset($mcConf['mc_conf_version']) || (BVPrependInfo::MC_CONF_VERSION !== $mcConf['mc_conf_version'])) {
 				return false;
 			}
+
+			$mcIPsConf = $this->parseFile($this->mcIPsFile);
+			$mcRuleSet = $this->parseFile($this->mcRulesFile);
 
 			$brand = array_key_exists('brandname', $mcConf) ? $mcConf['brandname'] : "Protect";
 			$bvinfo = new BVPrependInfo($brand);
@@ -58,7 +60,7 @@ require_once dirname( __FILE__ ) . '/logger.php';
 			$fwlogger = new BVPrependLogger();
 
 			$fwConfHash = array_key_exists('fw', $mcConf) ? $mcConf['fw'] : array();
-			$fw = new BVFW($fwlogger, $fwConfHash, $ip, $bvinfo, $bvipstore, $mcRuleSet);
+			$fw = BVFW::getInstance($fwlogger, $fwConfHash, $ip, $bvinfo, $bvipstore, $mcRuleSet);
 
 			if ($fw->isActive()) {
 
@@ -69,7 +71,8 @@ require_once dirname( __FILE__ ) . '/logger.php';
 				register_shutdown_function(array($fw, 'log'));
 
 				$fw->execute();
-				define('MCFWLOADED', true);
+				$fw->executeRules();
+				define('MCWAFLOADED', true);
 			}
 
 			return true;

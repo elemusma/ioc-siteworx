@@ -100,12 +100,22 @@ class Breeze_Lazy_Load {
 		// The native lazy load is not yet supported by all browsers. ( As of February 2021, 73% of browsers support lazy loading. )
 		$use_native = apply_filters( 'breeze_use_native_lazy_load', $this->lazy_load_native );
 
+		$content = mb_convert_encoding( $content, 'HTML-ENTITIES', 'UTF-8' );
+
 		$html_dom                     = new DOMDocument();
 		$html_dom->preserveWhiteSpace = false;// phpcs:ignore
 		$html_dom->formatOutput       = false;// phpcs:ignore
 
 		libxml_use_internal_errors( true );
-		$html_dom->loadHTML( $content, LIBXML_NOERROR );  // | LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD
+
+        preg_match_all( '/<script\b(?![^>]*\bsrc\s*=)[^>]*>(.*?)<\/script>/is', $content, $script_matches );
+
+		if ( ! empty( $script_matches ) && ! empty( $script_matches[0][0] ) ) {
+			foreach ( $script_matches[0] as $index => $script_js ) {
+				$content = str_replace( $script_js, '<!--{BREEZE_SCRIPT_PH' . $index . '}-->', $content );
+			}
+		}
+		$html_dom->loadHTML( $content, LIBXML_NOERROR | LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD );  //  | LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD | HTML_PARSE_NOIMPLIED
 
 		$dom_last_error = libxml_get_last_error();
 		$dom_all_error  = libxml_get_errors();
@@ -258,7 +268,18 @@ class Breeze_Lazy_Load {
 			}
 		}
 
-		return $html_dom->saveHTML();
+		//return $html_dom->saveHTML( $html_dom->documentElement );
+		$content_return = $html_dom->saveHTML();
+
+
+		if ( ! empty( $script_matches ) && ! empty( $script_matches[0][0] ) ) {
+			foreach ( $script_matches[0] as $index => $script_js ) {
+				$content_return = str_replace( '<!--{BREEZE_SCRIPT_PH' . $index . '}-->', $script_js, $content_return );
+			}
+		}
+
+		return $content_return;
+
 	}
 
 	/**

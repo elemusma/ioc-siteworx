@@ -48,24 +48,21 @@ class BVWPDynSync {
 	}
 
 	function get_ignored_postmeta() {
-		$defaults = array(
-			'_excluded_links'
-		);
 		$ignored_postmeta = $this->ignored_events['postmeta'];
 		if (empty($ignored_postmeta)) {
 			$ignored_postmeta = array();
 		}
-		return array_unique(array_merge($defaults, $ignored_postmeta));
+		return array_unique($ignored_postmeta);
 	}
 
 	function postmeta_insert_handler($meta_id, $post_id, $meta_key, $meta_value='') {
-		if (in_array($meta_key, $this->get_ignored_postmeta(), true))
+		if ($this->is_key_ignored($this->get_ignored_postmeta(), $meta_key))
 			return;
 		$this->add_db_event('postmeta', array('meta_id' => $meta_id));
 	}
 
 	function postmeta_modification_handler($meta_id, $object_id, $meta_key, $meta_value) {
-		if (in_array($meta_key, $this->get_ignored_postmeta(), true))
+		if ($this->is_key_ignored($this->get_ignored_postmeta(), $meta_key))
 			return;
 		if (!is_array($meta_id))
 			return $this->add_db_event('postmeta', array('meta_id' => $meta_id));
@@ -75,7 +72,7 @@ class BVWPDynSync {
 	}
 
 	function postmeta_action_handler($meta_id, $post_id = null, $meta_key = null) {
-		if (in_array($meta_key, $this->get_ignored_postmeta(), true))
+		if ($this->is_key_ignored($this->get_ignored_postmeta(), $meta_key))
 			return;
 		if ( !is_array($meta_id) )
 			return $this->add_db_event('postmeta', array('meta_id' => $meta_id));
@@ -189,37 +186,27 @@ class BVWPDynSync {
 	}
 
 	function get_ignored_options() {
-		$defaults = array(
-			'cron',
-			'wpsupercache_gc_time',
-			'rewrite_rules',
-			'akismet_spam_count',
-			'iwp_client_user_hit_count',
-			'_disqus_sync_lock',
-			'stats_cache'
-		);
 		$ignored_options = $this->ignored_events['options'];
 		if (empty($ignored_options)) {
 			$ignored_options = array();
 		}
-		return array_unique(array_merge($defaults, $ignored_options));
+		return array_unique($ignored_options);
 	}
 
-	function get_ping_permission($option_name) {
-		$ping_permitted = true;
-		$ignored_options = $this->get_ignored_options();
-		foreach($ignored_options as $val) {
+	function is_key_ignored($ignored_keys, $value) {
+		$is_ignored = false;
+		foreach($ignored_keys as $val) {
 			if ($val[0] == '/') {
-				if (preg_match($val, $option_name))
-					$ping_permitted = false;
+				if (preg_match($val, $value))
+					$is_ignored = true;
 			} else {
-				if ($val == $option_name)
-					$ping_permitted = false;
+				if ($val == $value)
+					$is_ignored = true;
 			}
-			if (!$ping_permitted)
+			if ($is_ignored)
 				break;
 		}
-		return $ping_permitted;
+		return $is_ignored;
 	}
 
 	function option_handler($option_name) {
@@ -227,8 +214,8 @@ class BVWPDynSync {
 			$msg_type = 'delete';
 		else
 			$msg_type = 'edit';
-		$ping_permitted = $this->get_ping_permission($option_name);
-		if ($ping_permitted)
+		$is_ignored = $this->is_key_ignored($this->get_ignored_options(), $option_name);
+		if (!$is_ignored)
 			$this->add_db_event('options', array('option_name' => $option_name, 'msg_type' => $msg_type));
 		return $option_name;
 	}
@@ -258,11 +245,11 @@ class BVWPDynSync {
 	}
 
 	function sitemeta_handler($option) {
-		$ping_permitted = $this->get_ping_permission($option);
-		if ($ping_permitted && is_multisite()) {
+		$is_ignored = $this->is_key_ignored($this->get_ignored_options(), $option);
+		if (!$is_ignored && is_multisite()) {
 			$this->add_db_event('sitemeta', array('site_id' => $this->db->getSiteId(), 'meta_key' => $option));
 		}
-		return $ping_permitted;
+		return !$is_ignored;
 	}
 
 	/* WOOCOMMERCE SUPPORT FUNCTIONS BEGINS FROM HERE*/
@@ -278,6 +265,25 @@ class BVWPDynSync {
 				$this->add_db_event('woocommerce_order_itemmeta', array('meta_id' => $row->meta_id, 'msg_type' => 'delete'));
 			}
 		}
+	}
+
+	function woocommerce_update_order_handler($order_id, $order = null) {
+		$this->add_db_event('wc_orders', array('id' => $order_id));
+		$this->add_db_event('wc_orders_meta', array('order_id' => $order_id));
+		$this->add_db_event('wc_order_addresses', array('order_id' => $order_id));
+		$this->add_db_event('wc_order_operational_data', array('order_id' => $order_id));
+	}
+
+	function woocommerce_trash_order_handler($order_id) {
+		$this->add_db_event('wc_orders', array('id' => $order_id));
+		$this->add_db_event('wc_orders_meta', array('order_id' => $order_id));
+	}
+
+	function woocommerce_delete_order_handler($order_id) {
+		$this->add_db_event('wc_orders', array('id' => $order_id, 'msg_type' => 'delete'));
+		$this->add_db_event('wc_orders_meta', array('order_id' => $order_id, 'msg_type' => 'delete'));
+		$this->add_db_event('wc_order_addresses', array('order_id' => $order_id, 'msg_type' => 'delete'));
+		$this->add_db_event('wc_order_operational_data', array('order_id' => $order_id, 'msg_type' => 'delete'));
 	}
 
 	function woocommerce_new_order_item_handler($item_id, $item, $order_id) {
@@ -559,7 +565,7 @@ class BVWPDynSync {
 		add_action('edit_attachment', array($this, 'post_action_handler'));
 		add_action('add_attachment', array($this, 'post_action_handler'));
 		add_action('delete_attachment', array($this, 'post_action_handler'));
-		add_action('private_to_published', array($this, 'post_action_handler'));
+		add_action('private_to_publish', array($this, 'post_action_handler'));
 		add_action('wp_restore_post_revision', array($this, 'post_action_handler'));
 
 		/* CAPTURING EVENTS FOR WP_POSTMETA TABLE */
@@ -611,6 +617,9 @@ class BVWPDynSync {
 		add_action('update_site_option', array($this, 'sitemeta_handler'), 10, 1);
 
 		/* CAPTURING EVENTS FOR WOOCOMMERCE */
+		add_action('woocommerce_update_order', array($this, 'woocommerce_update_order_handler'), 10, 2);
+		add_action('woocommerce_delete_order', array($this, 'woocommerce_delete_order_handler'), 10, 1);
+		add_action('woocommerce_trash_order', array($this, 'woocommerce_trash_order_handler'), 10, 1);
 		add_action('woocommerce_resume_order', array($this, 'woocommerce_resume_order_handler'), 10, 1);
 		add_action('woocommerce_new_order_item', 	array($this, 'woocommerce_new_order_item_handler'), 10, 3);
 		add_action('woocommerce_update_order_item', array($this, 'woocommerce_update_order_item_handler'), 10, 2);

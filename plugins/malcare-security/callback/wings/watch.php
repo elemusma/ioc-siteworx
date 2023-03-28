@@ -7,7 +7,7 @@ class BVWatchCallback extends BVCallbackBase {
 	public $db;
 	public $settings;
 
-	const WATCH_WING_VERSION = 1.0;
+	const WATCH_WING_VERSION = 1.1;
 
 	public function __construct($callback_handler) {
 		$this->db = $callback_handler->db;
@@ -94,8 +94,8 @@ class BVWatchCallback extends BVCallbackBase {
 				require_once dirname( __FILE__ ) . '/../../protect/wp/lp/config.php';
 				$lp_params = $params['lp'];
 				if (!isset($lp_params['bv_check_table']) || $db->isTablePresent($db->getBVTable(BVWPLPConfig::$requests_table))) {
-					$limit = intval(urldecode($lp_params['limit']));
-					$filter = urldecode($lp_params['filter']);
+					$limit = intval($lp_params['limit']);
+					$filter = $lp_params['filter'];
 					$db->deleteBVTableContent(BVWPLPConfig::$requests_table, $lp_params['rmfilter']);
 					$table = $db->getBVTable(BVWPLPConfig::$requests_table);
 					$resp["lplogs"] = $this->getData($table, $limit, $filter);
@@ -113,8 +113,8 @@ class BVWatchCallback extends BVCallbackBase {
 				require_once dirname( __FILE__ ) . '/../../protect/fw/config.php';
 				$fw_params = $params['fw'];
 				if (!isset($fw_params['bv_check_table']) || $db->isTablePresent($db->getBVTable(BVFWConfig::$requests_table))) {
-					$limit = intval(urldecode($fw_params['limit']));
-					$filter = urldecode($fw_params['filter']);
+					$limit = intval($fw_params['limit']);
+					$filter = $fw_params['filter'];
 					$db->deleteBVTableContent(BVFWConfig::$requests_table, $fw_params['rmfilter']);
 					$table = $db->getBVTable(BVFWConfig::$requests_table);
 					$resp["fwlogs"] = $this->getData($table, $limit, $filter);
@@ -128,8 +128,8 @@ class BVWatchCallback extends BVCallbackBase {
 				$isdynsyncactive = $settings->getOption('bvDynSyncActive');
 				if ($isdynsyncactive == 'yes') {
 					if (!isset($params['bv_check_table']) || $db->isTablePresent($db->getBVTable(BVWPDynSync::$dynsync_table))) {
-						$limit = intval(urldecode($params['limit']));
-						$filter = urldecode($params['filter']);
+						$limit = intval($params['limit']);
+						$filter = $params['filter'];
 						$this->deleteBvDynamicEvents($params['rmfilter']);
 						$table = $db->getBVTable(BVWPDynSync::$dynsync_table);
 						$data = $this->getData($table, $limit, $filter);
@@ -145,8 +145,8 @@ class BVWatchCallback extends BVCallbackBase {
 				require_once dirname( __FILE__ ) . '/../../wp_actlog.php';
 				$actlog_params = $params['actlog'];
 				if (!isset($actlog_params['bv_check_table']) || $db->isTablePresent($db->getBVTable(BVWPActLog::$actlog_table))) {
-					$limit = intval(urldecode($actlog_params['limit']));
-					$filter = urldecode($actlog_params['filter']);
+					$limit = intval($actlog_params['limit']);
+					$filter = $actlog_params['filter'];
 					$db->deleteBVTableContent(BVWPActLog::$actlog_table, $actlog_params['rmfilter']);
 					$table = $db->getBVTable(BVWPActLog::$actlog_table);
 					$resp["actlogs"] = $this->getData($table, $limit, $filter);
@@ -155,11 +155,24 @@ class BVWatchCallback extends BVCallbackBase {
 				}
 			}
 
+			if (array_key_exists('airlift_stats', $params)) {
+				$airlift_stats_table = "airlift_stats";
+				$airlift_stats_params = $params['airlift_stats'];
+				$table = $db->getBVTable($airlift_stats_table);
+				if (!isset($airlift_stats_params['bv_check_table']) || $db->isTablePresent($table)) {
+					$limit = intval($airlift_stats_params['limit']);
+					$filter = $airlift_stats_params['filter'];
+					$db->deleteBVTableContent($airlift_stats_table, $airlift_stats_params['rmfilter']);
+					$resp["airlift_stats"] = $this->getData($table, $limit, $filter);
+				} else {
+					$resp["airlift_stats"] = array("status" => "TABLE_NOT_PRESENT");
+				}
+			}
 			$resp["status"] = "done";
 			break;
 		case "rmdata":
 			require_once dirname( __FILE__ ) . '/../../wp_dynsync.php';
-			$filter = urldecode($params['filter']);
+			$filter = $params['filter'];
 			$resp = array("status" => $this->deleteBvDynamicEvents($filter));
 			break;
 		default:

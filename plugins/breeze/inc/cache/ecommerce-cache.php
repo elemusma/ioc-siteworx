@@ -417,6 +417,46 @@ class Breeze_Ecommerce_Cache {
 	}
 
 	/**
+	 * Exclude pages from cache for the plugin BuddyBoss.
+	 *
+	 * @return array
+	 */
+	public function buddyboss_exclude_urls(): array {
+		$urls  = array();
+		$regex = '*';
+
+		if ( !function_exists('bbp_get_current_user_id') || !function_exists('bbp_get_user_profile_url') ) {
+			return $urls;
+		}
+
+		if ( class_exists( 'BuddyPress' ) ) {
+			$user_id     = bbp_get_current_user_id();
+			$url_profile = bbp_get_user_profile_url( $user_id );
+			$url_profile = trailingslashit( $url_profile );
+
+			$user = get_userdata( $user_id );
+			if ( ! empty( $user->user_nicename ) ) {
+				$user_nicename = $user->user_nicename;
+				$url_profile   = str_replace( $user_nicename . '/', '', $url_profile );
+			}
+
+			$url_profile = parse_url( $url_profile, PHP_URL_PATH ) . $regex;
+			#$url_profile .= '/profile/' . $regex;
+
+			$urls[] = $url_profile;
+
+
+			if ( ! empty( $urls ) ) {
+				// Process urls to return
+				$urls = array_unique( $urls );
+				$urls = array_map( array( $this, 'rtrim_urls' ), $urls );
+			}
+		}
+
+		return $urls;
+	}
+
+	/**
 	 * Exclude pages of e-commerce from cache
 	 */
 	public function ecommerce_exclude_pages() {
@@ -464,7 +504,12 @@ class Breeze_Ecommerce_Cache {
 	public function wc_facebook_feed() {
 		$urls = array();
 		if ( class_exists( 'WC_Facebook_Loader' ) ) {
+			if ( class_exists( 'SkyVerge\WooCommerce\Facebook\Products\Feed' ) ) {
 			$urls[] = SkyVerge\WooCommerce\Facebook\Products\Feed::get_feed_data_url();
+		}
+			if ( class_exists( 'WooCommerce\Facebook\Products\Feed' ) ) {
+				$urls[] = WooCommerce\Facebook\Products\Feed::get_feed_data_url();
+			}
 		}
 
 		return $urls;
@@ -624,6 +669,10 @@ class Breeze_Ecommerce_Cache {
 	 * Remove '/' chacracter of end url
 	 */
 	public function rtrim_urls( $url ) {
+		if ( empty( $url ) || ! is_string( $url ) ) {
+			return $url;
+		}
+
 		return rtrim( $url, '/' );
 	}
 

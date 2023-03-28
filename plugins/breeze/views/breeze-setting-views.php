@@ -2,6 +2,9 @@
 
 defined( 'ABSPATH' ) or die;
 
+// Thickbox for popups
+add_thickbox();
+
 $global_tabs = array(
 	'faq',
 );

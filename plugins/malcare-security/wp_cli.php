@@ -23,7 +23,7 @@ class MCWPCli {
 		$request_params['bvpublic'] = MCAccount::getApiPublicKey($this->settings);
 		$request_params['bvsecret'] = MCRecover::defaultSecret($this->settings);
 		$url = $this->bvinfo->appUrl()."/api/v3/accounts/".$params['account_id']."/sites";
-		foreach (preg_grep('#site_id|email|password|wp_cli_command#i', array_keys($params)) as $key ) {
+		foreach (preg_grep('#site_id|email|password|wp_cli_command|is_staging_env#i', array_keys($params)) as $key ) {
 			$request_params[$key] = $params[$key];
 		}
 		$headers = array(

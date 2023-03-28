@@ -1053,5 +1053,73 @@ function breeze_migrate_old_settings( $is_sigle = true, $subsite_id = 0, $is_roo
 }
 
 function breeze_rtrim_urls( $url ) {
+	if(empty($url)){
+		$url = '';
+	}
 	return rtrim( $url, '/' );
+}
+
+/**
+ * Check the CDN url to see if it's safe to use.
+ *
+ * @param $cdn_url
+ *
+ * @return false|string
+ * @since 2.0.11
+ */
+function breeze_static_check_cdn_url( $cdn_url ) {
+	if ( empty( trim( $cdn_url ) ) ) {
+		return false;
+	}
+
+	$breeze_user_agent = 'breeze-cdn-check-help-user';
+
+	$verify_host      = 2;
+	$ssl_verification = apply_filters( 'breeze_ssl_check_certificate', true );
+	if ( ! is_bool( $ssl_verification ) ) {
+		$ssl_verification = true;
+	}
+
+	if ( defined( 'WP_DEBUG' ) && true === WP_DEBUG ) {
+		$ssl_verification = false;
+		$verify_host      = 0;
+	}
+
+
+	$cdn_url = ltrim( $cdn_url, 'https:' );
+	$cdn_url = 'https:' . $cdn_url;
+
+	if ( false === filter_var( $cdn_url, FILTER_VALIDATE_URL ) ) {
+		return false;
+	}
+
+	$connection = curl_init( 'https://sitecheck.sucuri.net/api/v3/?scan=' . $cdn_url );
+	curl_setopt( $connection, CURLOPT_RETURNTRANSFER, true );
+	curl_setopt( $connection, CURLOPT_SSL_VERIFYHOST, $verify_host );
+	curl_setopt( $connection, CURLOPT_SSL_VERIFYPEER, $ssl_verification );
+	curl_setopt( $connection, CURLOPT_USERAGENT, $breeze_user_agent );
+	curl_setopt( $connection, CURLOPT_REFERER, home_url() );
+
+	/**
+	 * Accept up to 3 maximum redirects before cutting the connection.
+	 */
+	curl_setopt( $connection, CURLOPT_MAXREDIRS, 3 );
+	curl_setopt( $connection, CURLOPT_FOLLOWLOCATION, true );
+	$the_json = curl_exec( $connection );
+	curl_close( $connection );
+
+	$is_json = json_decode( $the_json, true );
+	if ( $is_json === null && json_last_error() !== JSON_ERROR_NONE ) {
+		// incorrect data show error message
+		$is_safe = false;
+	} else {
+		// decoded with success
+		$is_safe = false;
+		if ( isset( $is_json['warnings'], $is_json['warnings']['security'], $is_json['warnings']['security']['malware'] ) ) {
+			$is_safe = 'warning';
+
+		}
+	}
+
+	return $is_safe;
 }

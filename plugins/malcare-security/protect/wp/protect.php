@@ -28,7 +28,7 @@ class BVProtect {
 		$bvipstore = new BVIPStore($this->db);
 		$bvipstore->init();
 		$bvinfo = new MCInfo($this->settings);
-		
+
 		$config = $this->settings->getOption($bvinfo->services_option_name);
 		if (array_key_exists('protect', $config)) {
 			$config = $config['protect'];
@@ -38,12 +38,12 @@ class BVProtect {
 
 		$ipHeader = array_key_exists('ipheader', $config) ? $config['ipheader'] : false;
 		$ip = BVProtectBase::getIP($ipHeader);
-		
+
 		$fwLogger = new BVLogger($this->db, BVFWConfig::$requests_table);
 
 		$fwConfHash = array_key_exists('fw', $config) ? $config['fw'] : array();
 		$ruleSet = $this->getRuleSet();
-		$fw = new BVFW($fwLogger, $fwConfHash, $ip, $bvinfo, $bvipstore, $ruleSet);
+		$fw = BVFW::getInstance($fwLogger, $fwConfHash, $ip, $bvinfo, $bvipstore, $ruleSet);
 
 		if ($fw->isActive()) {
 
@@ -51,15 +51,21 @@ class BVProtect {
 				add_action('init', array($fw, 'setBypassCookie'));
 			}
 
-			if (!defined('MCFWLOADED') && $fw->canSetIPCookie()) {
+			if (!defined('MCWAFLOADED') && $fw->canSetIPCookie()) {
 				$fw->setIPCookie();
 			}
 
-			if (!defined('MCFWLOADED')) {
+			define('BVWPLOADED', true);
+
+			if (!defined('MCWAFLOADED')) {
 				register_shutdown_function(array($fw, 'log'));
 
 				$fw->execute();
+			} elseif ($fw->isGeoBlocking()) {
+				$fw->blockIfBlacklisted();
 			}
+
+			$fw->executeRules();
 		}
 
 		$lpConfHash = array_key_exists('lp', $config) ? $config['lp'] : array();

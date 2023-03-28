@@ -12,9 +12,16 @@ class BVFW {
 	public $ipstore;
 	public $category;
 	public $logger;
-	public $ruleSet;
+	public $generic_rule_set = array();
+	public $wpf_rule_set = array();
 	public $ruleEvaluator;
 	public $break_rule_evaluation;
+	public $ruleActions = array();
+	private static $instance = null;
+
+	#RuleLevels
+	const GENERIC = 1;
+	const WPF = 2;
 
 	const SQLIREGEX = '/(?:[^\\w<]|\\/\\*\\![0-9]*|^)(?:
 		@@HOSTNAME|
@@ -53,15 +60,25 @@ class BVFW {
 	const IP_COOKIE = "bvfw-ip-cookie";
 	const PREVENT_CACHE_COOKIE = "wp-bvfw-prevent-cache-cookie";
 
-	public function __construct($logger, $confHash, $ip, $bvinfo, $ipstore, $ruleSet) {
+	#singleton design
+	private function __construct($logger, $confHash, $ip, $bvinfo, $ipstore, $ruleSet) {
 		$this->config = new BVFWConfig($confHash);
 		$this->request = new BVWPRequest($ip);
 		$this->bvinfo = $bvinfo;
 		$this->ipstore = $ipstore;
 		$this->logger = $logger;
-		$this->ruleSet = $ruleSet;
-		$this->ruleEvaluator = new BVFWRuleEvaluator($this->request);
+		$this->initializeLevelWiseRuleSets($ruleSet);
+		$this->ruleEvaluator = new BVFWRuleEvaluator($this);
 		$this->break_rule_evaluation = false;
+	}
+
+	public static function getInstance($logger, $confHash, $ip, $bvinfo, $ipstore, $ruleSet) {
+		if (!isset(self::$instance)) {
+			self::$instance = new BVFW($logger, $confHash, $ip, $bvinfo, $ipstore, $ruleSet);
+		} else {
+			self::$instance->ipstore = $ipstore;
+		}
+		return self::$instance;
 	}
 
 	public function setcookie($name, $value, $expire) {
@@ -139,6 +156,11 @@ class BVFW {
 	public function isActive() {
 		return $this->config->isActive();
 	}
+
+	public function isGeoBlocking() {
+		return $this->config->isGeoBlocking;
+	}
+
 	public function canSetAdminCookie() {
 		return ($this->config->adminCookieMode === BVFWConfig::ADMIN_COOKIE_MODE_ENABLED);
 	}
@@ -162,8 +184,8 @@ class BVFW {
 		if ($this->config->isCompleteLoggingEnabled()) {
 			$canlog = true;
 		} else if ($this->config->isVisitorLoggingEnabled()) {
-			$canlog = !$this->hasValidBypassCookie() &&
-					(!function_exists('is_user_logged_in') || !is_user_logged_in());
+			$canlog = ($this->request->hasMatchedRules()) || (!$this->hasValidBypassCookie() &&
+					(!function_exists('is_user_logged_in') || !is_user_logged_in()));
 		}
 		return $canlog;
 	}
@@ -215,6 +237,10 @@ class BVFW {
 			$this->request->setCategory(BVWPRequest::WHITELISTED);
 			$this->request->setStatus(BVWPRequest::BYPASSED);
 			return true;
+		} else if(BVProtectBase::isPrivateIP($this->request->getIP())) {
+			$this->request->setCategory(BVWPRequest::PRIVATEIP);
+			$this->request->setStatus(BVWPRequest::BYPASSED);
+			return true;
 		}
 		return false;
 	}
@@ -227,38 +253,79 @@ class BVFW {
 		return true;
 	}
 
+	public function blockIfBlacklisted() {
+		if (!$this->canBypassFirewall() && $this->config->isProtecting()) {
+			$ip_category = $this->ipstore->getTypeIfBlacklistedIP($this->request->getIP());
+			if ($ip_category) {
+				$this->terminateRequest($ip_category);
+			}
+		}
+	}
+
 	public function execute() {
 		if ($this->config->canProfileReqInfo()) {
 			$result = array();
-
-			if ($this->request->getMethod() === 'POST' &&
-				preg_match('/(admin-ajax.php|admin-post.php)$/', $this->request->getPath())) {
-				$result += $this->profileRequestInfo(array("action" => $this->request->getPostParams('action')),
-					true, 'BODY[');
+			$has_debug_mode = $this->config->isReqProfilingModeDebug();
+			$action = $this->request->getAction();
+			if (isset($action)) {
+				$result += $this->profileRequestInfo(array("action" => $action),
+						true, 'ACTION[');
 			}
 			$result += $this->profileRequestInfo($this->request->getPostParams(),
-					$this->config->isReqProfilingModeDebug(), 'BODY[');
+					$has_debug_mode, 'BODY[');
 			$result += $this->profileRequestInfo($this->request->getGetParams(),
 					true, 'GET[');
 			$result += $this->profileRequestInfo($this->request->getFiles(),
 					true, 'FILES[');
-			$result += $this->profileRequestInfo($this->getBVCookies(),
-					true, 'COOKIES[');
+			$cookies = $has_debug_mode ? $this->request->getCookies() : $this->getBVCookies();
+			$result += $this->profileRequestInfo($cookies, true, 'COOKIES[');
 			$this->request->updateReqInfo($result);
 		}
+		$this->blockIfBlacklisted();
+	}
 
-		if (!$this->canBypassFirewall() && $this->config->isProtecting()) {
-			if ($this->isBlacklistedIP()) {
-				$this->terminateRequest(BVWPRequest::BLACKLISTED);
-			}
-			if ($this->config->isRulesModeEnabled()) {
-				if (is_array($this->ruleSet)) {
-					$this->evaluateRules($this->ruleSet);
+	public function canExecuteRules() {
+		if (!$this->isWhitelistedIP() && $this->config->isRulesModeEnabled()) {
+			return true;
+		}
+		return false;
+	}
+
+	public function initializeLevelWiseRuleSets($rule_set) {
+		if (!is_array($rule_set)) {
+			$this->request->updateRulesInfo('errors', 'ruleset', 'Invalid RuleSet');
+			return;
+		}
+
+		foreach ($rule_set as $rule) {
+			if (BVFWRuleEvaluator::VERSION >= $rule["min_rule_engine_ver"]) {
+				if (array_key_exists("level", $rule) && $rule["level"] == BVFW::WPF) {
+					array_push($this->wpf_rule_set, $rule);
 				} else {
-					$this->request->updateRulesInfo('errors', 'ruleset', 'Invalid RuleSet');
+					array_push($this->generic_rule_set, $rule);
 				}
 			}
 		}
+	}
+
+	public function ruleSetToExecute() {
+		$rule_set = array();
+		if ($this->isWpLoaded()) {
+			$rule_set = $this->wpf_rule_set;
+		}
+		if (!defined('MCWAFLOADED') && !$this->hasValidBypassCookie()) {
+			$rule_set = array_merge($rule_set, $this->generic_rule_set);
+		}
+		return $rule_set;
+	}
+
+	public function executeRules() {
+		if (!$this->canExecuteRules()) {
+			return;
+		}
+
+		$rule_set = $this->ruleSetToExecute();
+		$this->evaluateRules($rule_set);
 	}
 
 	public function matchCount($pattern, $subject) {
@@ -389,52 +456,67 @@ class BVFW {
 		foreach ($ruleSet as $rule) {
 			$id = $rule["id"];
 			$ruleLogic = $rule["rule_logic"];
-			$actions = $rule["actions"];
-			$min_rule_engine_ver = $rule["min_rule_engine_ver"];
+			$this->ruleActions[$id] = $rule["actions"];
 			$this->ruleEvaluator->resetErrors();
 
-			if (BVFWRuleEvaluator::VERSION >= $min_rule_engine_ver) {
-				if ($this->ruleEvaluator->evaluateRule($ruleLogic) && empty($this->ruleEvaluator->getErrors())) {
-					$this->request->updateMatchedRules($id);
-					$this->executeActions($actions);
-				} elseif (!empty($this->ruleEvaluator->getErrors())) {
-					$this->request->updateRulesInfo("errors", (string) $id, $this->ruleEvaluator->getErrors());
-				}
+			if ($this->ruleEvaluator->evaluateRule($ruleLogic) && empty($this->ruleEvaluator->getErrors())) {
+				$this->handleMatchedRule($id);
+			} elseif (!empty($this->ruleEvaluator->getErrors())) {
+				$this->request->updateRulesInfo("errors", (string) $id, $this->ruleEvaluator->getErrors());
 			}
+
 			if ($this->break_rule_evaluation) {
 				return;
 			}
 		}
 	}
 
-	function executeActions($actions){
-		foreach($actions as $action) {
+	function handleMatchedRule($id) {
+		$this->request->updateMatchedRules($id);
+		$this->executeActions($id);
+	}
+
+	function executeActions($id){
+		foreach($this->ruleActions[$id] as $action) {
 			switch ($action["type"]) {
 			case "ALLOW":
 				$this->break_rule_evaluation = true;
 				$this->request->setCategory(BVWPRequest::RULE_ALLOWED);
 				return;
 			case "BLOCK":
-				$this->terminateRequest(BVWPRequest::RULE_BLOCKED);
+				if ($this->config->isProtecting()) {
+					$this->terminateRequest(BVWPRequest::RULE_BLOCKED);
+				}
 				return;
 			case "INSPECT":
 				$this->inspectRequest();
-				break;
-			case "DEBUG":
-				//TODO
-				break;
-			case "SCRUB":
-				//TODO
-				break;
-			case "FILTER":
-				//TODO
 				break;
 			}
 		}
 	}
 
+	function isWPLoaded() {
+		return defined('BVWPLOADED');
+	}
+
+	function getCurrentWPUser() {
+		if (!$this->isWPLoaded()) {
+			return;
+		}
+		if (!function_exists('wp_get_current_user')) {
+			@include_once(ABSPATH . "wp-includes/pluggable.php");
+		}
+		return wp_get_current_user();
+	}
+
 	public function inspectRequest() {
 		$this->request->updateRulesInfo('inspect', "headers", $this->request->getHeaders());
+
+		$wp_user = $this->getCurrentWPUser();
+		if ($wp_user && isset($wp_user->ID)) {
+			$this->request->updateRulesInfo('inspect', "userID", $wp_user->ID);
+		}
+
 		$this->request->updateRulesInfo('inspect', "getParams", $this->request->getGetParams());
 		$this->request->updateRulesInfo('inspect', "postParams", $this->getPostParamsToLog($this->request->getPostParams()));
 		$this->request->updateRulesInfo('inspect', "cookies", $this->request->getCookies());

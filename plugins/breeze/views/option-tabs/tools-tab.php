@@ -94,4 +94,23 @@ if ( is_multisite() ) {
 		</div>
 	</div>
 	<!-- END OPTION -->
+
+    <!--  START OPTION  -->
+    <div class="br-option-item">
+        <div class="br-label">
+            <div class="br-option-text">
+                <?php _e( 'Reset all settings', 'breeze' ); ?>
+            </div>
+        </div>
+        <div class="br-option">
+            <input type="button" name="breeze_reset_default" id="breeze_reset_default" class="br-blue-button" value="<?php _e( 'Reset Now', 'breeze' ); ?>">
+            <input type="hidden" id="breeze-level" value="<?php echo esc_attr( $level ); ?>">
+
+            <div class="br-note">
+                <p style="font-weight: bold">
+                </p>
+            </div>
+        </div>
+    </div>
+    <!--  END OPTION    -->
 </section>

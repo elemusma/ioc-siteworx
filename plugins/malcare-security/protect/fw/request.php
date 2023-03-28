@@ -36,6 +36,8 @@ class BVWPRequest {
 	const USER_BLACKLISTED = 50;
 	const RULE_BLOCKED     = 60;
 	const RULE_ALLOWED     = 70;
+	const PRIVATEIP        = 80;
+	const GLOBAL_BOT_BLOCKED = 90;
 
 	public function __construct($ip) {
 		$fileNames = array();
@@ -110,6 +112,19 @@ class BVWPRequest {
 		$this->category = $category;
 	}
 
+	public static function blacklistedCategories() {
+		return array(
+			BVWPRequest::BOT_BLOCKED,
+			BVWPRequest::COUNTRY_BLOCKED,
+			BVWPRequest::USER_BLACKLISTED,
+			BVWPRequest::GLOBAL_BOT_BLOCKED
+		);
+	}
+
+	public static function whitelistedCategories() {
+		return array(BVWPRequest::WHITELISTED);
+	}
+
 	public function setPostParams($postParams) {
 		$this->postParams = $postParams;
 	}
@@ -178,6 +193,10 @@ class BVWPRequest {
 
 	public function getMatchedRules() {
 		return $this->matchedRules;
+	}
+
+	public function hasMatchedRules() {
+		return !empty($this->matchedRules);
 	}
 
 	public function updateReqInfo($info) {
@@ -312,6 +331,15 @@ class BVWPRequest {
 
 	public function getURI() {
 		return $this->uri;
+	}
+
+	public function getAction() {
+		$post_action = $this->getPostParams('action');
+		if (isset($post_action)) {
+			return $post_action;
+		} else {
+			return $this->getGetParams('action');
+		}
 	}
 
 	public function getPath() {

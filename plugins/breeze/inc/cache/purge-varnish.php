@@ -100,12 +100,31 @@ class Breeze_PurgeVarnish {
 					do_action( 'breeze_clear_all_cache' );
 				}
 			}
+			if ( isset( $_GET['breeze_purge_cloudflare'] ) && check_admin_referer( 'breeze_purge_cache_cloudflare' ) ) {
+				$reset   = Breeze_CloudFlare_Helper::reset_all_cache();
+				$json    = json_decode( trim( $reset ), true );
+				$message = __( 'CloudWays - Cloudflare microservice was not reachable. ', 'breeze' );
+				$class   = 'notice notice-error is-dismissible breeze-notice';
+				if ( null !== $json && json_last_error() === JSON_ERROR_NONE && isset( $json['success'] ) ) {
+					$success = filter_var( $json['success'], FILTER_VALIDATE_BOOLEAN );
+					$class   = 'notice notice-warning is-dismissible breeze-notice';
+					$message = __( 'Cloudflare cache data has not been purged. ', 'breeze' );
+					if ( true === $success ) {
+						$message = __( 'Cloudflare cache data has been purged. ', 'breeze' );
+						$class   = 'notice notice-success is-dismissible breeze-notice';
+					}
+				}
+				printf( '<div id="message-clear-cache-top" class="%1$s" style="margin: 10px 14px 10px 0;padding: 10px; display: none; font-weight: 600;"><p>%2$s</p><button type="button" class="notice-dismiss"><span class="screen-reader-text">Dismiss this notice.</span></button></div>', esc_attr( $class ), esc_html( $message ) );
+			}
+
 			if ( isset( $_GET['breeze_purge'] ) && check_admin_referer( 'breeze_purge_cache' ) ) {
 				//clear varnish cache
 				$admin = new Breeze_Admin();
 				$admin->breeze_clear_varnish();
 				//clear static cache
 				$size_cache = Breeze_Configuration::breeze_clean_cache();
+				Breeze_CloudFlare_Helper::reset_all_cache();
+
 				if ( (int) $size_cache > 0 ) {
 					$class = 'notice notice-success is-dismissible breeze-notice';
 					$message =  __( 'Cache data has been purged: ', 'breeze' ) . $size_cache . __( ' Kb static cache cleaned', 'breeze' ) ;
@@ -129,6 +148,9 @@ class Breeze_PurgeVarnish {
 	 *
 	 */
 	public function purge_cache( $url ) {
+		if ( true === Breeze_CloudFlare_Helper::is_log_enabled() ) {
+			error_log( '######### PURGE VANISH; URL(s) ###: ' . var_export( $url, true ) );
+		}
 		$parseUrl = parse_url( $url );
 		$pregex   = '';
 		// Default method is URLPURGE to purge only one object, this method is specific to cloudways configuration

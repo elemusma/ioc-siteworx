@@ -295,6 +295,14 @@ class Breeze_ConfigCache {
 			$ecommerce_exclude_urls = Breeze_Ecommerce_Cache::factory()->ecommerce_exclude_pages();
 		}
 
+		if ( class_exists( 'BuddyPress' ) ) {
+			$exclude_buddyboss_pages = Breeze_Ecommerce_Cache::factory()->buddyboss_exclude_urls();
+
+			if ( ! empty( $exclude_buddyboss_pages ) ) {
+				$ecommerce_exclude_urls = array_merge( $exclude_buddyboss_pages, $ecommerce_exclude_urls );
+			}
+		}
+
 		if ( function_exists( 'EDD' ) ) {
 			$exclude_edd_pages = Breeze_Ecommerce_Cache::factory()->exclude_edd_pages();
 

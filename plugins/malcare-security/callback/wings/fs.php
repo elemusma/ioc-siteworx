@@ -9,7 +9,7 @@ class BVFSCallback extends BVCallbackBase {
 	public $account;
 
 	public static $cwAllowedFiles = array(".htaccess", ".user.ini", "malcare-waf.php");
-	const FS_WING_VERSION = 1.0;
+	const FS_WING_VERSION = 1.2;
 
 	public function __construct($callback_handler) {
 		$this->account = $callback_handler->account;
@@ -251,11 +251,11 @@ class BVFSCallback extends BVCallbackBase {
 			$this->stream = $stream_init_info['stream'];
 			switch ($request->method) {
 			case "scanfilesglob":
-				$initdir = urldecode($params['initdir']);
-				$offset = intval(urldecode($params['offset']));
-				$limit = intval(urldecode($params['limit']));
-				$bsize = intval(urldecode($params['bsize']));
-				$regex = urldecode($params['regex']);
+				$initdir = $params['initdir'];
+				$offset = intval($params['offset']);
+				$limit = intval($params['limit']);
+				$bsize = intval($params['bsize']);
+				$regex = $params['regex'];
 				$recurse = true;
 				if (array_key_exists('recurse', $params) && $params["recurse"] == "false") {
 					$recurse = false;
@@ -268,11 +268,11 @@ class BVFSCallback extends BVCallbackBase {
 				if (array_key_exists('dir_options', $params)) {
 					$dir_options = $params['dir_options'];
 				}
-				$bsize = intval(urldecode($params['bsize']));
+				$bsize = intval($params['bsize']);
 				foreach($dir_options as $option) {
-					$dir = urldecode($option['dir']);
-					$offset = intval(urldecode($option['offset']));
-					$limit = intval(urldecode($option['limit']));
+					$dir = $option['dir'];
+					$offset = intval($option['offset']);
+					$limit = intval($option['limit']);
 					$recurse = true;
 					if (array_key_exists('recurse', $option) && $option["recurse"] == "false") {
 						$recurse = false;
@@ -289,9 +289,9 @@ class BVFSCallback extends BVCallbackBase {
 				break;
 			case "getfilesstats":
 				$files = $params['files'];
-				$offset = intval(urldecode($params['offset']));
-				$limit = intval(urldecode($params['limit']));
-				$bsize = intval(urldecode($params['bsize']));
+				$offset = intval($params['offset']);
+				$limit = intval($params['limit']);
+				$bsize = intval($params['bsize']);
 				$md5 = false;
 				if (array_key_exists('md5', $params)) {
 					$md5 = true;
@@ -300,9 +300,9 @@ class BVFSCallback extends BVCallbackBase {
 				break;
 			case "sendmanyfiles":
 				$files = $params['files'];
-				$offset = intval(urldecode($params['offset']));
-				$limit = intval(urldecode($params['limit']));
-				$bsize = intval(urldecode($params['bsize']));
+				$offset = intval($params['offset']);
+				$limit = intval($params['limit']);
+				$bsize = intval($params['bsize']);
 				$resp = $this->uploadFiles($files, $offset, $limit, $bsize);
 				break;
 			case "filelist":
@@ -357,6 +357,39 @@ class BVFSCallback extends BVCallbackBase {
 				$files = $params['files'];
 				$withContent = array_key_exists('withcontent', $params) ? $params['withcontent'] : true;
 				$resp = array("files_content" => $this->getFilesContent($files, $withContent));
+				break;
+			case "gtfls":
+				$resp = array();
+
+				if (array_key_exists('get_files_content', $params)) {
+					$args = $params['get_files_content'];
+					$with_content = array_key_exists('withcontent', $args) ? $args['withcontent'] : true;
+					$resp['get_files_content'] = $this->getFilesContent($args['files'], $with_content);
+				}
+
+				if (array_key_exists('get_files_stats', $params)) {
+					$args = $params['get_files_stats'];
+					$md5 = array_key_exists('md5', $args) ? $args['md5'] : false;
+					$stats = $this->getFilesStats(
+							$args['files'], $args['offset'], $args['limit'], $args['bsize'], $md5
+					);
+
+					$result = array();
+
+					if (array_key_exists('stats', $stats)) {
+						$result['stats'] = array();
+						foreach ($stats['stats'] as $stat) {
+							$result['stats'][$stat['filename']] = $stat;
+						}
+					}
+
+					if (array_key_exists('missingfiles', $stats)) {
+						$result['missingfiles'] = $stats['missingfiles'];
+					}
+
+					$resp['get_files_stats'] = $result;
+				}
+
 				break;
 			default:
 				$resp = false;

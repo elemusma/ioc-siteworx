@@ -1,4 +1,4 @@
-( function ( $ ) {
+function initLayoutEditor( $ ) {
 
 	/**
 	 * Get the group ID of the targeted element.
@@ -37,7 +37,7 @@
 
 		var field;
 
-		this.css( 'grid-column', 'span {0}'.format( span ) );
+		this.css( 'grid-column', 'span {0}'.gformFormat( span ) );
 
 		this.each( function () {
 			// Spacer fields are pseudo-fields; they are generated when the last field in the group is resized and are
@@ -63,6 +63,10 @@
 	 * @returns {number}
 	 */
 	$.fn.getGridColumnSpan = function () {
+		if( undefined === this.css('gridColumnStart') ) {
+			return;
+		}
+
 		// Use 'gridColumnStart' instead of 'grid-column' as Firefox returns null for the latter.
 		var span = parseInt( this.css( 'gridColumnStart' ).split( ' ' )[ 1 ] );
 		if ( isNaN( span ) && typeof columnCount !== 'undefined' ) {
@@ -71,14 +75,29 @@
 		return span;
 	};
 
+	$.fn.resizeGroup = function ( groupID ) {
+		resizeGroup( groupID );
+	};
+
 	/**
 	 * Replace placeholders in the targeted string with passed values.
 	 *
 	 * @returns {string}
 	 */
-	String.prototype.format = function () {
+	if ( ! String.prototype.gformFormat ) {
+		String.prototype.gformFormat = function() {
+			var args = arguments;
+			return this.replace( /{(\d+)}/g, function( match, number ) {
+				return typeof args[ number ] != 'undefined' ? args[ number ] : match;
+			} );
+		};
+	}
+
+	// deprecated. remove in 2.8
+	String.prototype.format = function() {
 		var args = arguments;
-		return this.replace( /{(\d+)}/g, function ( match, number ) {
+		console.warn( 'String.format will be replaced with String.gformFormat in Gravity Forms version 2.8.' );
+		return this.replace( /{(\d+)}/g, function( match, number ) {
 			return typeof args[ number ] != 'undefined' ? args[ number ] : match;
 		} );
 	};
@@ -93,6 +112,7 @@
 		$fields = $elements(),
 		$elem = null,
 		fieldButtonsSelector = '.add-buttons button';
+
 
 	/**
 	 * The max column count determined by the fields container's grid CSS.
@@ -125,6 +145,9 @@
 
 	// Parse and maybe patch group ids
 	validateGroupIds();
+
+	// Set the correct group for the submit button.
+	setSubmitButtonGroup();
 
 	// Initialize field buttons.
 	initFieldButtons( $( fieldButtonsSelector ) );
@@ -169,6 +192,11 @@
 
 			$field.setGroupId( getGroupId() );
 
+			// If the submit button is inline, move it back to its own row
+			if( jQuery('#field_submit').data( 'field-position' ) == 'inline' ) {
+				moveButtonToBottom();
+			}
+
 		}
 		// This field was added by dragging into the editor.
 		else {
@@ -182,10 +210,7 @@
 
 		// editor is receiving first field, cleanup placeholders and no fields class, maybe init simplebar
 		if ( $editorContainer.hasClass( 'form_editor_fields_no_fields' ) ) {
-			// we dont run simplebar in noconflict mode
-			if ( ! $editorContainer.hasClass( 'form_editor_no_conflict' ) ) {
-				gform.simplebar.initializeInstance( $editorContainer[ 0 ] );
-			}
+			gform.simplebar.initializeInstance( $editorContainer[ 0 ] );
 			setTimeout( function() {
 				$noFieldsDropzone.hide();
 				$editorContainer.removeClass( 'form_editor_fields_no_fields' );
@@ -196,11 +221,25 @@
 
 		initElement( $field );
 
+		if ( field['type'] === 'page' ) {
+			moveButtonToBottom();
+			jQuery('input[name="submit_location"][value="inline"]').prop( 'disabled', true );
+			SetFieldAccessibilityWarning( 'submit_location_setting', 'below' );
+		}
+
+		if ( ! jQuery( '#field_submit' ).length > 0 ) {
+			StartAddField( 'submit', Math.max( 0, $container.children().index( $elem ) + 1 ) );
+		}
+
 	} );
 
 	// Save the group ID of the deleted field.
 	$( document ).on( 'gform_field_deleted', function ( event, form, fieldId ) {
 		deletedFieldGroupId = getGroupId( $( '#field_' + fieldId ) );
+		if ( ! HasPageField() ) {
+			jQuery('input[name="submit_location"][value="inline"]').prop( 'disabled', false );
+			jQuery( '.submit_location_setting' ).prev( '.gform-alert--notice' ).remove();
+		}
 	} );
 
 	// Handle resizing the group after the deleted field has been fully removed from the DOM.
@@ -230,12 +269,31 @@
 		initElement( $( '#field_' + fieldId ) );
 	} );
 
+		gform.addAction( 'gform_form_saving_action_element_after_reload', function( form, event, newElement, elementReloadId, existingElement ) {
+			if ( $( newElement ).hasClass( 'gfield' ) ) {
+				initElement( $( '[data-js-reload="' + elementReloadId + '"]' ) );
+			}
+
+			if ( $( newElement ).hasClass( 'editor-sidebar' ) ) {
+				initFieldButtons( $( fieldButtonsSelector ) );
+			}
+
+		} );
+
+		gform.addAction( 'gform_form_saving_action_editor_has_new_components', function( form, event, newElement, currentSidebar, newSidebar ) {
+			initFieldButtons( $( fieldButtonsSelector ) );
+		} );
+
 	gform.addAction( 'gform_before_get_field_markup', function( form, field, index ) {
 		addFieldPlaceholder( field, index );
 	} );
 
 	gform.addAction( 'gform_after_get_field_markup', function( form, field, index ) {
 		removeFieldPlaceholder();
+	} );
+
+	gform.addAction( 'gform_after_get_field_markup', function( form, field, index ) {
+		initSubmit();
 	} );
 
 	gform.addAction( 'gform_before_field_duplicated', function( sourcefieldId ) {
@@ -257,6 +315,16 @@
 		removeFieldUpdateIndicator( field_id );
 	} );
 
+	/**
+	 * Make the submit button resizable when it is first added to the form.
+	 *
+	 * @since 2.6
+	 */
+	function initSubmit() {
+		var submitField = jQuery( '#field_submit' );
+		initElement( submitField );
+	}
+
 	function addFieldPlaceholder( field, index ) {
 
 		var fieldString = '<li data-js-field-loading-placeholder><div class="dropzone__loader">' +
@@ -272,7 +340,11 @@
 				$( '#gform_fields' ).children().eq( index - 1 ).after( fieldString );
 			}
 		} else {
-			$( '#gform_fields' ).append( fieldString );
+			if ( jQuery( '#field_submit' ) ) {
+				jQuery( fieldString ).insertBefore ( jQuery( '#field_submit' ) );
+			} else {
+				$( '#gform_fields' ).append( fieldString );
+			}
 		}
 
 		$( '[data-js-field-loading-placeholder]' ).setGridColumnSpan( columnCount );
@@ -409,6 +481,12 @@
 						}
 					}
 
+					if ( ui.element.data( 'fieldClass' ) === 'gform_editor_submit_container' ) {
+						min = 1;
+					} else {
+						min = columnCount / 4;
+					}
+
 					/**
 					 * We've calculated the desired span based on the physical size of the field. Now let's adjust it to
 					 * make sure it's not too big or too small.
@@ -416,7 +494,13 @@
 					 * If the field is in a group, we will deduct the minimum span from the max to always save room for
 					 * the field to it's right. If it the last field, we do not have to save this room.
 					 */
-					span = getAdjustedGridColumnSpan( span, min, max - ( $group.length > 1 && ! lastInGroup ? min : 0 ) );
+					var calculatedMax = max;
+					if ( $item.next().data( 'fieldClass' ) === 'gform_editor_submit_container' ) {
+						calculatedMax = max - 1;
+					} else if ( $group.length > 1 && ! lastInGroup ) {
+						calculatedMax = max - min;
+					}
+					span = getAdjustedGridColumnSpan( span, min, calculatedMax );
 
 					$().add( ui.helper ).add( ui.element )
 						// Resizable will set a width with each increment, we have to deliberately override this.
@@ -544,6 +628,21 @@
 	}
 
 	/**
+	 * @function setSubmitButtonGroup
+	 * @description Sets the submit button's group ID to the group ID of the last row if it is inline.
+	 *
+	 * @since 2.6
+	 */
+	function setSubmitButtonGroup() {
+		if ( $( '#field_submit' ).data( 'field-position') === 'inline' ) {
+			// Find the last group id.
+			var lastGroup = jQuery( '#field_submit' ).prev().attr( 'data-groupid' );
+			// Move the submit button to the group.
+			jQuery( '#field_submit' ).setGroupId( lastGroup );
+		}
+	}
+
+	/**
 	 * Initialize the field buttons so they can be dragged over the layout editor.
 	 *
 	 * @param {jQuery} $buttons All field buttons.
@@ -551,6 +650,8 @@
 	function initFieldButtons( $buttons ) {
 		$buttons
 			.on( 'mousedown touchstart', function() {
+				// closes any open flyouts
+				gform.tools.trigger( 'gform/flyout/close-all' );
 				// hides the tooltip during drag, stop method sets it back using the data-description
 				// start was too late to execute this with, the tooltip would persist in some browsers
 				$( this ).attr( 'title', '' );
@@ -664,17 +765,19 @@
 		}
 		// Check if field is dragged *below* all other fields.
 		else if ( helperTop > $container.outerHeight() ) {
-			$indicator()
-				.css( {
-					top: $container.outerHeight() - 14,
-					left: 0,
-					height: '4px',
-					width: $container.outerWidth()
-				} )
-				.data( {
-					where: 'bottom',
-					target: $elements().last()
-				} );
+			if ( $elements().last().data( 'field-class' ) !== 'gform_editor_submit_container' && $elements().last().prev().data( 'field-class' ) !== 'gform_editor_submit_container' ) {
+				$indicator()
+					.css( {
+						top: $container.outerHeight() - 14,
+						left: 0,
+						height: '4px',
+						width: $container.outerWidth()
+					} )
+					.data( {
+						where: 'bottom',
+						target: $elements().last()
+					} );
+			}
 			return;
 		}
 
@@ -716,13 +819,31 @@
 
 				var available = isSpaceAvailable( ui, $target );
 
+				if ( $target.data( 'field-class' ) === 'gform_editor_submit_container' ) {
+					if ( gform.tools.isRtl() ) {
+						if ( where === 'left' || where === 'bottom' ) {
+							return;
+						}
+					}
+					if ( where === 'right' || where === 'bottom' ) {
+						return;
+					}
+				}
+
 				if ( where === 'left' || where === 'right' ) {
+					if ( $target.data( 'field-position' ) === 'bottom' ) {
+						return;
+					}
 					// Columns are not supported in Legacy markup or with Page or Section fields.
 					if ( ! areColumnsEnabled( $target, $elem ) ) {
 						return;
 					} else if ( isGroupMaxed || ( available === false ) ) {
 						return;
 					}
+				}
+
+				if ( where === 'bottom' && isButtonInGroup( $targetGroup ) ) {
+					return;
 				}
 
 				$indicator().data( {
@@ -755,7 +876,6 @@
 
 						return false;
 					case 'bottom':
-
 						$indicator().css( {
 							top: sibPos.top + $target.outerHeight() + 26,
 							left: 0,
@@ -939,6 +1059,10 @@
 			return;
 		}
 
+		if ( $target.hasClass( 'gform_button' ) ) {
+			return;
+		}
+
 		var targetSpan,
 			splitSpan,
 			$targetGroup,
@@ -1052,11 +1176,11 @@
 	function getGroup( groupId, spacers ) {
 		if ( spacers || 'undefined' === typeof( spacers ) ) {
 			return $elements()
-				.filter( '[data-groupId="{0}"]'.format( groupId ) )
+				.filter( '[data-groupId="{0}"]'.gformFormat( groupId ) )
 				.not( '.ui-draggable-dragging' );
 		} else {
 			return $elements()
-				.filter( '[data-groupId="{0}"]'.format( groupId ) )
+				.filter( '[data-groupId="{0}"]'.gformFormat( groupId ) )
 				.not( '.ui-draggable-dragging' )
 				.not( '.spacer' );
 		}
@@ -1099,6 +1223,9 @@
 	 */
 	function isEvenSplit( $group ) {
 
+		if ( $group.length === 0 ) {
+			return isEvenSplit = true;
+		}
 		var baseSpan = $group.first().getGridColumnSpan(),
 			isEvenSplit = true;
 
@@ -1144,6 +1271,31 @@
 	function isLastInGroup( $elem, $group ) {
 		$group = $group.not( '.spacer' );
 		return $group.length === 1 || $group.last()[ 0 ] === $elem[ 0 ];
+	}
+
+	/**
+	 * Determine if a submit button is in the group.
+	 *
+	 * @since 2.6
+	 *
+	 * @param {jQuery} $group The group of field elements to check for a submit button.
+	 *
+	 * @returns {boolean}
+	 */
+	function isButtonInGroup( $group ) {
+		return $group.filter( '[data-field-class="gform_editor_submit_container"]' ).length > 0;
+	}
+
+	/**
+	 * Move the button to the bottom of the form and adjust the location setting.
+	 *
+	 * @since 2.6
+	 *
+	 */
+	function moveButtonToBottom() {
+		SetSubmitLocation( 'bottom' );
+		jQuery('#field_submit').attr( 'data-field-position', 'bottom' );
+		jQuery('input[name="submit_location"][value="bottom"]').prop( 'checked', true );
 	}
 
 	/**
@@ -1264,4 +1416,6 @@
 		return $indicator;
 	}
 
-} )( jQuery );
+}
+
+initLayoutEditor( jQuery );

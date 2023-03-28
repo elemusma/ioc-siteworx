@@ -5,16 +5,19 @@ if (!class_exists('BVCallbackBase')) :
 
 class BVCallbackBase {
 
-	const WING_INFOS = array("ACTLOG_WING_VERSION" => '1.0',
+	public static $wing_infos = array("MANAGE_WING_VERSION" => '1.1',
+		"ACTLOG_WING_VERSION" => '1.0',
+		"DYNSYNC_WING_VERSION" => '1.0',
+		"UPGRADER_WING_VERSION" => '1.0',
 		"BRAND_WING_VERSION" => '1.0',
-		"DB_WING_VERSION" => '1.0',
-		"ACCOUNT_WING_VERSION" => '1.0',
-		"MISC_WING_VERSION" => '1.0',
-		"FS_WING_VERSION" => '1.0',
-		"INFO_WING_VERSION" => '1.0',
-		"WATCH_WING_VERSION" => '1.0',
+		"DB_WING_VERSION" => '1.2',
+		"ACCOUNT_WING_VERSION" => '1.1',
+		"MISC_WING_VERSION" => '1.2',
+		"FS_WING_VERSION" => '1.2',
+		"INFO_WING_VERSION" => '1.5',
+		"WATCH_WING_VERSION" => '1.1',
 		"FS_WRITE_WING_VERSION" => '1.0',
-		"IPSTORE_WING_VERSION" => '1.0',
+		"IPSTORE_WING_VERSION" => '1.1',
 		"PROTECT_WING_VERSION" => '1.0',
 		);
 

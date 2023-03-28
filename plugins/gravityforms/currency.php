@@ -17,11 +17,20 @@ if ( ! class_exists( 'RGCurrency' ) ) {
 			}
 		}
 
+		/**
+		 * Removes currency formatting from a value.
+		 *
+		 * @since unknown
+		 *
+		 * @param string|float|int $text The value to be cleaned of currency formatting.
+		 *
+		 * @return false|float|int
+		 */
 		public function to_number( $text ) {
 			$text = strval( $text );
 
 			if ( is_numeric( $text ) ) {
-				return floatval( $text );
+				return $this->convert_number( $text );
 			}
 
 			//Making sure symbol is in unicode format (i.e. &#4444;)
@@ -66,7 +75,24 @@ if ( ! class_exists( 'RGCurrency' ) ) {
 				$float_number = '-' . $float_number;
 			}
 
-			return is_numeric( $float_number ) ? floatval( $float_number ) : false;
+			if ( ! is_numeric( $float_number ) ) {
+				return false;
+			}
+
+			return $this->convert_number( $float_number );
+		}
+
+		/**
+		 * Returns the given value as an integer or float based on the decimal configuration of the current currency.
+		 *
+		 * @since 2.6.1
+		 *
+		 * @param string $value The value to be converted.
+		 *
+		 * @return float|int
+		 */
+		private function convert_number( $value ) {
+			return $this->is_zero_decimal() ? intval( $value ) : floatval( $value );
 		}
 
 		public function to_money( $number, $do_encode = false ) {
@@ -378,6 +404,69 @@ if ( ! class_exists( 'RGCurrency' ) ) {
 
 			return apply_filters( 'gform_currencies', $currencies );
 		}
+
+		/**
+		 * Returns a sorted data object with filterable common currencies listed first, then all currencies either listed in
+		 * alphabetical or original order as found in self::get_currencies() above. Designed to drive a select 
+		 * in a format that select2 and our react select component understands.
+		 *
+		 * @since 2.7
+		 *
+		 * @param $placeholder
+		 * @param $sort
+		 *
+		 * @return array|array[]
+		 */
+
+		public static function get_grouped_currency_options( $placeholder = true, $sort = true ) {
+			/**
+			 * Filter the common currencies shown in currency selects that use this data. You'll
+			 * want to make sure the custom data that maps to the key is included in the gform_currencies
+			 * filter.
+			 *
+			 * @since 2.7
+			 *
+			 * @param array The currency keys to include.
+			 */
+			$common_currency_keys = apply_filters( 'gform_common_currencies', array(
+				'USD',
+				'GBP',
+				'EUR',
+			) );
+
+			$common_options = array_intersect_key( self::get_currencies(), array_flip( $common_currency_keys ) );
+			$all_options    = self::get_currencies();
+
+			if ( $sort ) {
+				uasort( $all_options, function( $a, $b ) {
+					return strcmp( strtolower( $a[ 'name' ] ), strtolower( $b[ 'name' ] ) );
+				} );
+			}
+
+			$options = $placeholder ? array(
+				array(
+					'label' => esc_html__( 'Select a Currency', 'gravityforms' ),
+					'value' => '',
+				)
+			) : array();
+
+			foreach( $common_options as $item ) {
+				$options[] = array(
+					'label' => esc_html__( $item['name'] ),
+					'value' => esc_html__( $item['code'] ),
+				);
+			}
+
+			foreach( $all_options as $item ) {
+				$options[] = array(
+					'label' => esc_html__( $item['name'] ),
+					'value' => esc_html__( $item['code'] ),
+				);
+			}
+
+			return $options;
+		}
+
 	}
 
 }

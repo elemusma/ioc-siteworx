@@ -75,7 +75,7 @@ class Breeze_Minify {
 	 * Will not execute for purge cache or heartbeat actions.
 	 */
 	public static function should_cache() {
-		if ( isset( $_GET['breeze_purge'] ) || ( isset( $_POST['action'] ) && 'heartbeat' === $_POST['action'] ) ) {
+		if ( isset( $_GET['breeze_purge_cloudflare'] ) || isset( $_GET['breeze_purge'] ) || ( isset( $_POST['action'] ) && 'heartbeat' === $_POST['action'] ) ) {
 			return false;
 		}
 
@@ -345,6 +345,10 @@ class Breeze_Minify {
 	 * Remove '/' chacracter of end url
 	 */
 	public function rtrim_urls( $url ) {
+		if ( ! is_string( $url ) ) {
+			$url = '';
+		}
+
 		return rtrim( $url, '/' );
 	}
 

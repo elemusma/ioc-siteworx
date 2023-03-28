@@ -81,6 +81,8 @@ class GF_Field_Repeater extends GF_Field {
 		/* @var GF_Field[] $fields */
 		$fields = $this->fields;
 
+		$context = GFFormDisplay::get_submission_context();
+
 		foreach ( $items as $i => $item ) {
 			foreach ( $fields as $field ) {
 
@@ -105,11 +107,28 @@ class GF_Field_Repeater extends GF_Field {
 					$field->validate( $field_value, $form );
 				}
 
-				$custom_validation_result = gf_apply_filters( array( 'gform_field_validation', $form['id'], $field->id ), array(
+				/**
+				 * Allows custom validation of the field value.
+				 *
+				 * @since Unknown
+				 * @since 2.6.4 Added the $context param.
+				 *
+				 * @param array    $result  {
+				 *    An array containing the validation result properties.
+				 *
+				 *    @type bool   $is_valid The field validation result.
+				 *    @type array  $message  The field validation message.
+				 * }
+				 * @param mixed    $value   The field value currently being validated.
+				 * @param array    $form    The form currently being validated.
+				 * @param GF_Field $field   The field currently being validated.
+				 * @param string   $context The context for the current submission. Possible values: form-submit, api-submit, api-validate.
+				 */
+				$result = gf_apply_filters( array( 'gform_field_validation', $form['id'], $field->id ), array(
 					'is_valid' => $field->failed_validation ? false : true,
 					'message'  => $field->validation_message
-				), $field_value, $form, $field );
-				$this->failed_validation  = rgar( $custom_validation_result, 'is_valid' ) ? false : true;
+				), $field_value, $form, $field, $context );
+				$this->failed_validation  = rgar( $result, 'is_valid' ) ? false : true;
 
 				// Reset the field validation and item index.
 				$field->failed_validation = false;
@@ -263,7 +282,7 @@ class GF_Field_Repeater extends GF_Field {
 	public function get_input_top( $values ) {
 		$html = "<fieldset class='gfield_repeater gfield_repeater_container'>\n";
 		$label = esc_html( $this->label );
-		$html .= "<legend class='gfield_label'>{$label}</legend>";
+		$html .= "<legend class='gfield_label gform-field-label'>{$label}</legend>";
 		return $html;
 	}
 
@@ -366,8 +385,8 @@ class GF_Field_Repeater extends GF_Field {
 
 		$add_button_class = $this->addButtonText ? 'add_repeater_item_text' : 'add_repeater_item_plus';
 		$remove_button_class = $this->removeButtonText ? 'remove_repeater_item_text' : 'remove_repeater_item_minus';
-		$html = "<button type='button' class='add_repeater_item {$disabled_icon_class} {$add_button_class}' {$add_events}>" . $add_button_text . "</button>" .
-		        "<button type='button' class='remove_repeater_item {$remove_button_class}' {$delete_events} style='{$delete_display}'>" . $remove_button_text . "</button>";
+		$html = "<button type='button' class='add_repeater_item gform-theme-button gform-theme-button--secondary gform-theme-button--size-sm {$disabled_icon_class} {$add_button_class}' {$add_events}>" . $add_button_text . "</button>" .
+		        "<button type='button' class='remove_repeater_item gform-theme-button gform-theme-button--secondary gform-theme-button--size-sm {$remove_button_class}' {$delete_events} style='{$delete_display}'>" . $remove_button_text . "</button>";
 
 		return $html;
 	}
@@ -453,7 +472,7 @@ class GF_Field_Repeater extends GF_Field {
 		$fields = $this->fields;
 		$html   = "<div class='gfield_repeater' {$repeater_style}>";
 		$repeater_label = $this->nestingLevel === 0 ? '' : $this->label;
-		$html   .= "<div class='gfield_label' {$label_style}>{$repeater_label}</div>";
+		$html   .= "<div class='gfield_label gform-field-label' {$label_style}>{$repeater_label}</div>";
 		$html   .= '<div class="gfield_repeater_items">';
 		foreach ( $item_values as $item_value ) {
 			$html .= '<div class="gfield_repeater_item">';
@@ -562,8 +581,8 @@ class GF_Field_Repeater extends GF_Field {
 		$replaced = array();
 		foreach ( $matches as $match ) {
 			if ( ! in_array( $match[1], $replaced ) ) {
-				$input_id      = $match[1] . "-{$index}";
-				$field_content = str_replace( $match[1], $input_id, $field_content );
+				$input_id      = str_replace( $match[1], $match[1] . "-${index}", $match[0] );
+				$field_content = str_replace( $match[0], $input_id, $field_content );
 				$replaced[]    = $match[1];
 			}
 		}
@@ -620,7 +639,11 @@ class GF_Field_Repeater extends GF_Field {
 			require_once( GFCommon::get_base_path() .'/form_display.php' );
 		}
 
-		$field_content = GFFormDisplay::get_field_content( $field, $value, true, $form['id'], $form );
+		if ( $field->type === 'repeater' ) {
+			$field_content = GFFormDisplay::get_field_content( $field, $value, true, $form['id'], $form );
+		} else {
+			$field_content = GFFormDisplay::get_field( $field, $value, true, $form );
+		}
 
 		$field->failed_validation = $validation_status;
 

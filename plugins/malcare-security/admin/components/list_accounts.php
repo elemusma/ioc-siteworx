@@ -10,20 +10,20 @@
 					foreach($accounts as $key => $value) {
 				?>
 					<form action="" method="post">
-						<input type='hidden' name='bvnonce' value="<?php echo $nonce; ?>" />
-						<input type='hidden' name='pubkey' value="<?php echo $key; ?>" />
+						<input type='hidden' name='bvnonce' value="<?php echo esc_attr($nonce); ?>" />
+						<input type='hidden' name='pubkey' value="<?php echo esc_attr($key); ?>" />
 						<tr>
-							<td><?php echo $value['email']; ?></td>
-							<td><?php echo date('Y-m-d H:i:s', $value['lastbackuptime']); ?></td>
-							<td><input type='submit' class="button-primary" value='Disconnect' name='disconnect' onclick="return confirm('Are you sure?');"></td>
+							<td><?php echo esc_html($value['email']); ?></td>
+							<td><?php echo esc_html(date('Y-m-d H:i:s', $value['lastbackuptime'])); ?></td>
+							<td><input type='submit' class="btn btn-primary" style="font-size: 12px" value='Disconnect' name='disconnect' onclick="return confirm('Are you sure?');"></td>
 						</tr>
 					</form>
 				<?php } ?>
 			</table>
 		</div>
 		<div style="margin: 15px;">
-			<a class="btn btn-primary" href="<?php echo $this->bvinfo->appUrl(); ?>" target="_blank">Visit Dashboard</a>
-			<a class="btn btn-primary" style="margin-left: 15px;" href="<?php echo $this->mainUrl('&add_account=true'); ?>">Connect New Account</a>
+			<a class="btn btn-primary" href="<?php echo esc_url($this->bvinfo->appUrl()); ?>" target="_blank">Visit Dashboard</a>
+			<a class="btn btn-primary" style="margin-left: 15px;" href="<?php echo esc_url($this->mainUrl('&add_account=true')); ?>">Connect New Account</a>
 		</div>
 	</div>
 </section>

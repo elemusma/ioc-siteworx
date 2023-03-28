@@ -27,18 +27,21 @@ if (!class_exists('MCWPAction')) :
 			} else {
 				MCAccount::setup($this->settings);
 			}
+			##ENABLECACHE##
 		}
 
 		public function deactivate() {
 			$info = array();
 			$this->siteinfo->basic($info);
+			##DISABLECACHE##
 			$this->bvapi->pingbv('/bvapi/deactivate', $info);
 		}
 
 		public static function uninstall() {
 			do_action('clear_pt_config');
 			do_action('clear_ip_store');
-			##CLEARDYNSYNCCONFIG##
+			do_action('clear_dynsync_config');
+			##CLEARCACHECONFIG##
 			do_action('clear_bv_services_config');
 		}
 
@@ -46,11 +49,13 @@ if (!class_exists('MCWPAction')) :
 			$this->settings->deleteOption($this->bvinfo->services_option_name);
 		}
 
+		##SOUNINSTALLFUNCTION##
+
 		public function footerHandler() {
 			$bvfooter = $this->settings->getOption($this->bvinfo->badgeinfo);
 			if ($bvfooter) {
 				echo '<div style="max-width:150px;min-height:70px;margin:0 auto;text-align:center;position:relative;">
-					<a href='.$bvfooter['badgeurl'].' target="_blank" ><img src="'.plugins_url($bvfooter['badgeimg'], __FILE__).'" alt="'.$bvfooter['badgealt'].'" /></a></div>';
+					<a href='.esc_url($bvfooter['badgeurl']).' target="_blank" ><img src="'.esc_url(plugins_url($bvfooter['badgeimg'], __FILE__)).'" alt="'.esc_attr($bvfooter['badgealt']).'" /></a></div>';
 			}
 		}
 	}

@@ -10,7 +10,7 @@ use Gravity_Forms\Gravity_Forms\Transients\GF_Transient_Strategy;
  *
  * Concrete Response class for the GF License API.
  *
- * @since 2.5
+ * @since 2.5.11
  *
  * @package Gravity_Forms\Gravity_Forms\License
  */
@@ -24,6 +24,8 @@ class GF_License_API_Response extends GF_API_Response {
 	/**
 	 * GF_License_API_Response constructor.
 	 *
+	 * @since 2.5.11
+	 *
 	 * @param mixed $data The data from the API connector.
 	 * @param bool $validate Whether to validate the data passed.
 	 * @param GF_Transient_Strategy $transient_strategy The Transient Strategy used to store things in transients.
@@ -36,8 +38,13 @@ class GF_License_API_Response extends GF_API_Response {
 			/**
 			 * @var \WP_Error $data
 			 */
-			$this->set_status( $data->get_error_code() );
-			$this->add_error( $data->get_error_message() );
+			if ( $data->get_error_code() == 'rest_invalid_param' ) {
+				$this->set_status( GF_License_Statuses::INVALID_LICENSE_KEY );
+				$this->add_error( __( 'The license is invalid.', 'gravityforms' ) );
+			} else {
+				$this->set_status( $data->get_error_code() );
+				$this->add_error( $data->get_error_message() );
+			}
 
 			if ( empty( $data->get_error_data() ) ) {
 				return;
@@ -83,6 +90,8 @@ class GF_License_API_Response extends GF_API_Response {
 	/**
 	 * Get the stored error for this site license.
 	 *
+	 * @since 2.5.11
+	 *
 	 * @return \WP_Error|false
 	 */
 	private function get_stored_error() {
@@ -91,6 +100,8 @@ class GF_License_API_Response extends GF_API_Response {
 
 	/**
 	 * Whether this license key is valid.
+	 *
+	 * @since 2.5.11
 	 *
 	 * @return bool
 	 */
@@ -109,6 +120,8 @@ class GF_License_API_Response extends GF_API_Response {
 	/**
 	 * Get the error message for the response, either the first one by default, or at a specific index.
 	 *
+	 * @since 2.5.11
+	 *
 	 * @param int $index The array index to use if mulitple errors exist.
 	 *
 	 * @return mixed|string
@@ -124,16 +137,21 @@ class GF_License_API_Response extends GF_API_Response {
 	/**
 	 * Get the human-readable display status for the response.
 	 *
+	 * @since 2.5.11
+	 *
 	 * @return string|void
 	 */
 	public function get_display_status() {
+
+		if ( $this->max_seats_exceeded() ) {
+			return __( 'Sites Exceeded', 'gravityforms' );
+		}
+
 		switch ( $this->get_status() ) {
 			case GF_License_Statuses::INVALID_LICENSE_KEY:
 				return __( 'Invalid', 'gravityforms' );
 			case GF_License_Statuses::EXPIRED_LICENSE_KEY:
 				return __( 'Expired', 'gravityforms' );
-			case GF_License_Statuses::MAX_SITES_EXCEEDED:
-				return __( 'Sites Exceeded', 'gravityforms' );
 			case GF_License_Statuses::VALID_KEY:
 			default:
 				return __( 'Active', 'gravityforms' );
@@ -143,6 +161,8 @@ class GF_License_API_Response extends GF_API_Response {
 	/**
 	 * Licenses can be valid and usable, technically-invalid but still usable, or invalid and unusable.
 	 * This will return the correct usability value for this license key.
+	 *
+	 * @since 2.5.11
 	 *
 	 * @return string
 	 */
@@ -165,6 +185,8 @@ class GF_License_API_Response extends GF_API_Response {
 	/**
 	 * Whether this response has any errors stored as a transient.
 	 *
+	 * @since 2.5.11
+	 *
 	 * @return bool
 	 */
 	private function has_stored_error() {
@@ -174,9 +196,11 @@ class GF_License_API_Response extends GF_API_Response {
 	/**
 	 * Get a properly-formatted link to the Upgrade page for this license key.
 	 *
+	 * @since 2.5.11
+	 *
 	 * @return string
 	 */
-	private function get_upgrade_link() {
+	public function get_upgrade_link() {
 		$key  = $this->get_data_value( 'license_key_md5' );
 		$type = $this->get_data_value( 'product_code' );
 
@@ -186,24 +210,35 @@ class GF_License_API_Response extends GF_API_Response {
 	/**
 	 * Get the CTA information for this license key, if applicable.
 	 *
+	 * @since 2.5.11
+	 *
 	 * @return mixed
 	 */
 	public function get_cta() {
-		switch ( $this->get_status() ) {
-			case GF_License_Statuses::EXPIRED_LICENSE_KEY:
-				return array(
-					'label' => __( 'Manage', 'gravityforms' ),
-					'link'  => 'https://www.gravityforms.com/my-account/licenses/?utm_source=gf-admin&utm_medium=manage-button&utm_campaign=license-enforcement',
-					'class' => 'cog',
-				);
-			case GF_License_Statuses::MAX_SITES_EXCEEDED:
-				return array(
-					'label' => __( 'Upgrade', 'gravityforms' ),
-					'link'  => $this->get_upgrade_link(),
-					'class' => 'product',
-				);
-			default:
-				return $this->get_data_value( 'days_to_expire' );
+
+		if ( $this->get_status() == GF_License_Statuses::EXPIRED_LICENSE_KEY ) {
+			return array(
+				'type'  => 'button',
+				'label' => __( 'Manage', 'gravityforms' ),
+				'link'  => 'https://www.gravityforms.com/my-account/licenses/?utm_source=gf-admin&utm_medium=manage-button&utm_campaign=license-enforcement',
+				'class' => 'cog',
+			);
+		} elseif ( $this->max_seats_exceeded() ) {
+			return array(
+				'type'  => 'button',
+				'label' => __( 'Upgrade', 'gravityforms' ),
+				'link'  => $this->get_upgrade_link(),
+				'class' => 'product',
+			);
+		} else if ( $this->has_expiration() ) {
+			return array(
+				'type'    => 'text',
+				'content' => $this->get_data_value( 'days_to_expire' ),
+			);
+		} else {
+			return array(
+				'type'    => 'blank',
+			);
 		}
 	}
 
@@ -211,13 +246,18 @@ class GF_License_API_Response extends GF_API_Response {
 	 * Some statuses are invalid, but get treated as usable. This determines if they should be displayed as
 	 * though they are valid.
 	 *
+	 * @since 2.5.11
+	 *
 	 * @return bool
 	 */
 	public function display_as_valid() {
+
+		if ( $this->max_seats_exceeded() ) {
+			return false;
+		}
 		switch ( $this->get_status() ) {
 			case GF_License_Statuses::INVALID_LICENSE_KEY:
 			case GF_License_Statuses::EXPIRED_LICENSE_KEY:
-			case GF_License_Statuses::MAX_SITES_EXCEEDED:
 				return false;
 			case GF_License_Statuses::VALID_KEY:
 			default:
@@ -228,6 +268,8 @@ class GF_License_API_Response extends GF_API_Response {
 	/**
 	 * Whether the license key can be used.
 	 *
+	 * @since 2.5.11
+	 *
 	 * @return bool
 	 */
 	public function can_be_used() {
@@ -235,57 +277,67 @@ class GF_License_API_Response extends GF_API_Response {
 	}
 
 	/**
-	 * Get the CTA type to display.
-	 *
-	 * @return string
-	 */
-	public function cta_type() {
-		if ( is_array( $this->get_cta() ) ) {
-			return 'button';
-		}
-
-		return 'text';
-	}
-
-	/**
 	 * Determine if the contained License Key has an expiration date.
+	 *
+	 * @since 2.5.11
 	 *
 	 * @return bool
 	 */
 	public function has_expiration() {
-		$expiration = $this->get_data_value( 'date_expires' );
-
-		if ( empty( $expiration ) ) {
-			return false;
-		}
-
-		$y = (int) gmdate( 'Y', strtotime( $expiration ) );
-
-		// 2038 is the latest timestamp we ever assign to a license; if it's present, this key doesn't expire.
-		return $y < 2038;
+		return $this->get_data_value( 'date_expires' ) && ! $this->get_data_value( 'renewal_date' ) && ! $this->get_data_value( 'is_perpetual' );
 	}
 
+	/**
+	 * Get the text for the renewal message.
+	 *
+	 * @since 2.5.11
+	 *
+	 * @return string
+	 */
 	public function renewal_text() {
-		if (  $this->get_status() === GF_License_Statuses::EXPIRED_LICENSE_KEY ) {
+		if ( $this->get_status() === GF_License_Statuses::EXPIRED_LICENSE_KEY ) {
 			return __( 'Expired On', 'gravityforms' );
 		}
 
-		$cancelled = $this->get_data_value( 'is_subscription_canceled' );
+		$has_subscription = (bool) $this->get_data_value( 'renewal_date' );
+		$cancelled        = (bool) $this->get_data_value( 'is_subscription_canceled' );
 
-		if ( ! $this->has_expiration() || $cancelled ) {
-			return __( 'Expires On', 'gravityforms' );
+		if ( $has_subscription && ! $cancelled ) {
+			return __( 'Renews On', 'gravityforms' );
 		}
 
-		return __( 'Renews On', 'gravityforms' );
+		return __( 'Expires On', 'gravityforms' );
+	}
+
+	/**
+	 * Returns the license renewal or expiry date or the doesn't expire message.
+	 *
+	 * @since 2.6.2
+	 *
+	 * @return string|void
+	 */
+	public function renewal_date() {
+		if ( $this->get_data_value( 'is_perpetual' ) ) {
+			return __( 'Does not expire', 'gravityforms' );
+		}
+
+		$date = $this->get_data_value( 'renewal_date' );
+		if ( empty( $date ) ) {
+			$date = $this->get_data_value( 'date_expires' );
+		}
+
+		return gmdate( 'M d, Y', strtotime( $date ) );
 	}
 
 	/**
 	 * Whether the license has max seats exceeded.
 	 *
+	 * @since 2.5.11
+	 *
 	 * @return bool
 	 */
 	public function max_seats_exceeded() {
-		return $this->get_status() === GF_License_Statuses::MAX_SITES_EXCEEDED;
+		return $this->get_status() === GF_License_Statuses::MAX_SITES_EXCEEDED || $this->get_data_value( 'remaining_seats' ) < 0;
 	}
 
 	//----------------------------------------
@@ -293,35 +345,37 @@ class GF_License_API_Response extends GF_API_Response {
 	//----------------------------------------
 
 	/**
-	 * Custom serialization method for this response type.
+	 * Prepares the object for serializing.
 	 *
-	 * @return string
+	 * @since 2.6.2
+	 *
+	 * @return array
 	 */
-	public function serialize() {
-		return serialize(
-			array(
-				'data'   => $this->data,
-				'errors' => $this->errors,
-				'status' => $this->status,
-				'meta'   => $this->meta,
-				'strat'  => $this->transient_strategy,
-			)
+	public function __serialize() {
+		return array(
+			'data'   => $this->data,
+			'errors' => $this->errors,
+			'status' => $this->status,
+			'meta'   => $this->meta,
+			'strat'  => $this->transient_strategy,
 		);
 	}
 
 	/**
-	 * Custom unserialization method for this response type.
+	 * Hydrates the object when unserializing.
 	 *
-	 * @param string $serialized
+	 * @since 2.6.2
+	 *
+	 * @param array $data The unserialized data.
+	 *
+	 * @return void
 	 */
-	public function unserialize( $serialized ) {
-		$parsed = unserialize( $serialized );
-
-		$this->data               = $parsed['data'];
-		$this->errors             = $parsed['errors'];
-		$this->status             = $parsed['status'];
-		$this->meta               = $parsed['meta'];
-		$this->transient_strategy = $parsed['strat'];
+	public function __unserialize( $data ) {
+		$this->data               = $data['data'];
+		$this->errors             = $data['errors'];
+		$this->status             = $data['status'];
+		$this->meta               = $data['meta'];
+		$this->transient_strategy = $data['strat'];
 	}
 
 }

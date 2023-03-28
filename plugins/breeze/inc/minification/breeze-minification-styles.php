@@ -56,6 +56,11 @@ class Breeze_MinificationStyles extends Breeze_MinificationBase {
 		if ( ! empty( $whitelistCSS ) ) {
 			$this->whitelist = array_filter( array_map( 'trim', explode( ',', $whitelistCSS ) ) );
 		}
+
+		if ( ! is_array( $this->whitelist ) ) {
+			$this->whitelist = array();
+		}
+
 		if ( $options['nogooglefont'] == true ) {
 			$removableCSS = 'fonts.googleapis.com';
 		} else {
@@ -186,6 +191,7 @@ class Breeze_MinificationStyles extends Breeze_MinificationBase {
 						if ( $this->include_inline ) {
 							$code = preg_replace( '#^.*<!\[CDATA\[(?:\s*\*/)?(.*)(?://|/\*)\s*?\]\]>.*$#sm', '$1', $code[1] );
 							if ( true == $this->group_css ) {
+								// Not the problem
 								if ( isset( $media[0] ) && 'print' === trim( $media[0] ) ) {
 									if ( false === strpos( $code, '@media' ) ) {
 										$code = '@media print{' . $code . '}';
@@ -200,7 +206,21 @@ class Breeze_MinificationStyles extends Breeze_MinificationBase {
 									}
 								}
 							}
+							$is_elementor_exception = false;
+							if ( defined( 'ELEMENTOR_VERSION' ) || defined( 'ELEMENTOR_PRO_VERSION' ) ) {
+								$is_elementor_exception = true;
+							}
+
+							if(false === $is_elementor_exception){
+								$this->css[] = array( $media, 'INLINE;' . $code );
+							}else{
+								if ( false === strpos( $code, '.elementor-' ) ) {
 							$this->css[] = array( $media, 'INLINE;' . $code );
+						} else {
+							$tag = '';
+						}
+					}
+
 						} else {
 							$tag = '';
 						}
@@ -241,6 +261,13 @@ class Breeze_MinificationStyles extends Breeze_MinificationBase {
 					$cssPath  = $css;
 					$css      = $this->fixurls( $cssPath, file_get_contents( $cssPath ) );
 					$css      = preg_replace( '/\x{EF}\x{BB}\x{BF}/', '', $css );
+					if (
+						false !== strpos( $css, '.elementor-products-grid ul.products.elementor-grid li.product' ) ||
+						false !== strpos( $css, 'li.product,.woocommerce-page ul.products[class*=columns-] li.product' )
+					) {
+
+					}
+
 					$tmpstyle = apply_filters( 'breeze_css_individual_style', $css, $cssPath );
 					if ( has_filter( 'breeze_css_individual_style' ) && ! empty( $tmpstyle ) ) {
 						$css                   = $tmpstyle;
@@ -253,12 +280,24 @@ class Breeze_MinificationStyles extends Breeze_MinificationBase {
 					$css = '';
 				}
 			}
+
+			$is_elementor_exception = false;
+			if ( class_exists( 'WooCommerce' ) && ( defined( 'ELEMENTOR_VERSION' ) || defined( 'ELEMENTOR_PRO_VERSION' ) ) ) {
+				$is_elementor_exception = true;
+			}
+
 			if ( $this->group_css == true ) {
 				foreach ( $media as $elem ) {
 					if ( ! isset( $this->csscode[ $elem ] ) ) {
 						$this->csscode[ $elem ] = '';
 					}
-					$this->csscode[ $elem ] .= "\n/*FILESTART*/" . $css;
+					if ( $is_elementor_exception && false !== strpos( $css, 'li.product,.woocommerce-page ul.products[class*=columns-] li.product' ) ) {
+						$this->csscode['all'] .= "\n/*FILESTART*/" . "@media {$elem}{" . $css . '}'; // TODO aici se strica
+					} else {
+						$this->csscode[$elem] .= "\n/*FILESTART*/" . "@media {$elem}{" . $css . '}';
+					}
+
+
 				}
 			} else {
 				foreach ( $media as $elem ) {

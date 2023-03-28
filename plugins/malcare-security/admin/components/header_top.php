@@ -9,27 +9,27 @@
 <div class="header-top">
 	<div class="top-links">
 		<span>
-			<a href="https://wordpress.org/support/plugin/<?php echo $plugin_slug; ?>/reviews/#new-post" target="_blank" rel="noopener noreferrer">
+			<a href="<?php echo esc_url("https://wordpress.org/support/plugin/" . $plugin_slug . "/reviews/#new-post"); ?>" target="_blank" rel="noopener noreferrer">
 				Leave a Review
 			</a>
 		</span>
 		&nbsp;
 		<span>
-			<a href="https://wordpress.org/support/plugin/<?php echo $plugin_slug; ?>/" target="_blank" rel="noopener noreferrer">
+			<a href="<?php echo esc_url("https://wordpress.org/support/plugin/" . $plugin_slug . "/"); ?>" target="_blank" rel="noopener noreferrer">
 				Need Help?
 			</a>
 		</span>
 	</div>
 	<div class="logo-img">
-		<a href="<?php echo $header_logo_link; ?>" target="_blank" rel="noopener noreferrer">
-			<img height="65" src="<?php echo $plugin_logo; ?>" alt="Logo">
+		<a href="<?php echo esc_url($header_logo_link); ?>" target="_blank" rel="noopener noreferrer">
+			<img height="65" src="<?php echo esc_url($plugin_logo); ?>" alt="Logo">
 		</a>
 	</div>
-	<h2 class="text-center heading"><?php echo $title; ?></h2>
+	<h2 class="text-center heading"><?php echo esc_html($title); ?></h2>
 	<div class="text-center intro-video">
-		<a href="<?php echo $intro_video_url; ?>" target="_blank" rel="noopener noreferrer">
-			<img src="<?php echo plugins_url("/../../img/play-video.png", __FILE__); ?>"/>
-			Watch the <?php echo $brand_name; ?> Video
+		<a href="<?php echo esc_url($intro_video_url); ?>" target="_blank" rel="noopener noreferrer">
+			<img src="<?php echo esc_url(plugins_url("/../../img/play-video.png", __FILE__)); ?>"/>
+			Watch the <?php echo esc_html($brand_name); ?> Video
 		</a>
 	</div>
 </div>

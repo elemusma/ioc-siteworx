@@ -152,6 +152,14 @@ class Breeze_MinificationScripts extends Breeze_MinificationBase {
 			return false;
 		}
 
+
+		if(false === $this->group_js && false === $this->include_inline){
+			$this->donotmove_exception[] = '/wp-includes/js/dist/i18n.js';
+			$this->donotmove_exception[] = '/wp-includes/js/dist/i18n.min.js';
+			$this->dontmove[] = '/wp-includes/js/dist/i18n.js';
+			$this->dontmove[] = '/wp-includes/js/dist/i18n.min.js';
+		}
+
 		$this->delay_javascript   = $options['delay_javascript'];
 		$this->is_inline_delay_on = $options['is_inline_delay_on'];
 		// only optimize known good JS?
@@ -282,7 +290,7 @@ class Breeze_MinificationScripts extends Breeze_MinificationBase {
 
 			foreach ( $matches[0] as $tag ) {
 
-				if ( false !== strpos( $tag, 'ga(' ) || false !== strpos( $tag, 'google-analytics.com/analytics.js' ) ) {
+				if ( true === breeze_is_script_ignored_from_delay( $tag ) ) {
 					$tag = '';
 					continue;
 				}
@@ -321,6 +329,10 @@ class Breeze_MinificationScripts extends Breeze_MinificationBase {
 
 					//exclude js
 					if ( ! empty( $is_excluded ) ) {
+						continue;
+					}
+
+					if ( false !== strpos( $tag, '.php' ) ) {
 						continue;
 					}
 
@@ -517,6 +529,9 @@ class Breeze_MinificationScripts extends Breeze_MinificationBase {
 
 					$scriptsrc = file_get_contents( $script );
 					$scriptsrc = preg_replace( '/\x{EF}\x{BB}\x{BF}/', '', $scriptsrc );
+					if(empty($scriptsrc)){
+						$scriptsrc = '';
+					}
 					$scriptsrc = rtrim( $scriptsrc, ";\n\t\r" ) . ';';
 
 					//Add try-catch?

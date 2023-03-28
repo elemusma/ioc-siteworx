@@ -43,6 +43,9 @@ if (!defined('GUTENBERG_VERSION_REQUIRED')) {
 }
 
 require_once(plugin_dir_path(__FILE__) . '/install.php');
+require_once(plugin_dir_path(__FILE__) . '/incl/utilities-main.php');
+require_once(plugin_dir_path(__FILE__) . '/incl/block-settings-main.php');
+require_once(plugin_dir_path(__FILE__) . '/incl/block-controls-main.php');
 require_once(plugin_dir_path(__FILE__) . '/incl/advanced-gutenberg-main.php');
 new AdvancedGutenbergMain();
 
@@ -121,7 +124,7 @@ if (! function_exists('advg_check_legacy_widget_block_init')) {
                         $advgb_blocks_user_roles[$current_user_role]['active_blocks'],
                         'core/legacy-widget'
                     );
-                    update_option( 'advgb_blocks_user_roles', $advgb_blocks_user_roles );
+                    update_option( 'advgb_blocks_user_roles', $advgb_blocks_user_roles, false );
                 }
             }
         }

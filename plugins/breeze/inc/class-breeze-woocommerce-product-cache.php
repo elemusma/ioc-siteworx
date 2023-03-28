@@ -32,16 +32,22 @@ class Breeze_Woocommerce_Product_Cache {
 			// Fetch the order products.
 			$items = $order->get_items();
 
+			$product_list_cd = array();
+
 			if ( ! empty( $items ) ) {
 				foreach ( $items as $item_id => $item_product ) {
 					$product_id = $item_product->get_product_id();
 
 					if ( ! empty( $product_id ) ) {
 						$url_path = get_permalink( $product_id );
-
+						$product_list_cd[] = $url_path;
 						// Clear Varnish server cache for this URL.
 						breeze_varnish_purge_cache( $url_path, $do_varnish_purge );
 					}
+				}
+
+				if ( ! empty( $product_list_cd ) ) {
+					Breeze_CloudFlare_Helper::purge_cloudflare_cache_urls( $product_list_cd );
 				}
 			}
 		}

@@ -11,7 +11,7 @@ class BVMiscCallback extends BVCallbackBase {
 	public $bvapi;
 	public $db;
 
-	const MISC_WING_VERSION = 1.0;
+	const MISC_WING_VERSION = 1.2;
 
 	public function __construct($callback_handler) {
 		$this->settings = $callback_handler->settings;
@@ -49,7 +49,7 @@ class BVMiscCallback extends BVCallbackBase {
 	}
 
 	public function getWingInfo() {
-		return array('wing_info' => self::WING_INFOS);
+		return array('wing_info' => self::$wing_infos);
 	}
 
 	public function post_types_data($post_params) {
@@ -155,6 +155,19 @@ class BVMiscCallback extends BVCallbackBase {
 		case "dlttrsnt":
 			$resp = array("dlttrsnt" => $settings->deleteTransient($params['key']));
 			break;
+		case "optns":
+			$resp = array();
+
+			if (array_key_exists("get_options", $params))
+				$resp["get_options"] = $settings->getOptions($params["get_options"]);
+
+			if (array_key_exists("update_options", $params))
+				$resp["update_options"] = $settings->updateOptions($params["update_options"]);
+
+			if (array_key_exists("delete_options", $params))
+				$resp["delete_options"] = $settings->deleteOptions($params["delete_options"]);
+
+			break;
 		case "setbvss":
 			$resp = array("status" => $settings->updateOption('bv_site_settings', $params['bv_site_settings']));
 			break;
@@ -189,6 +202,14 @@ class BVMiscCallback extends BVCallbackBase {
 				$taxonomy_result = $this->taxonomy_data($taxonomy_params);
 				$resp['taxonomy_cp_results'] = $taxonomy_result['taxonomy_data'];
 				$resp['taxonomies'] = $taxonomy_result['taxonomies'];
+			}
+			break;
+		case "permalink":
+			if (array_key_exists('post_ids', $params)) {
+				$resp = array();
+				foreach ( $params['post_ids'] as $id ) {
+					$resp[$id]['url'] = get_permalink($id);
+				}
 			}
 			break;
 		default:

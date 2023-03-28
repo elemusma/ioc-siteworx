@@ -1115,7 +1115,7 @@ body {
 .breeze-box .br-db-boxes {
   display: grid;
   margin-top: 40px;
-  margin-bottom: 20px;
+  margin-bottom: 50px;
   grid-template-columns: repeat(auto-fill, minmax(33%, 1fr));
 }
 @media only screen and (max-width: 1164px) {
@@ -1195,7 +1195,7 @@ body {
 }
 .breeze-box .br-overlay-disable {
   position: absolute;
-  background-color: #000000ad;
+  background-color: rgba(0, 0, 0, 0.6784313725);
   width: 100%;
   height: auto;
   z-index: 9999;
@@ -1257,7 +1257,7 @@ span.br-important {
 
 .br-inherit-wait {
   position: absolute;
-  background-color: #000000ad;
+  background-color: rgba(0, 0, 0, 0.6784313725);
   width: 100%;
   height: auto;
   z-index: 9999;
@@ -1302,6 +1302,151 @@ span.br-important {
   top: 0;
   bottom: 0;
   margin: auto;
-  background-color: #fcfcfdb8;
+  background-color: rgba(252, 252, 253, 0.7215686275);
   position: absolute;
+}
+
+/* Database Summary Table */
+#dbsummary-content .db-summary-count,
+#dbsummary-content .db-summary-size {
+  margin: 0;
+}
+#dbsummary-content .db-summary-count.critical,
+#dbsummary-content .db-summary-size.critical {
+  color: #ff2222;
+}
+@media only screen and (max-width: 782px) {
+  #dbsummary-content .wp-list-table tr:not(.inline-edit-row):not(.no-items) td.column-primary::before {
+    position: absolute;
+    left: 10px;
+    display: block;
+    overflow: hidden;
+    width: 32%;
+    content: attr(data-colname);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+}
+@media only screen and (max-width: 782px) {
+  #dbsummary-content .wp-list-table tr:not(.inline-edit-row):not(.no-items) td.column-primary {
+    padding: 3px 8px 3px 35%;
+  }
+}
+@media only screen and (max-width: 500px) {
+  #dbsummary-content .wp-list-table thead th.column-primary {
+    display: none;
+  }
+}
+#dbsummary-content thead tr th#number {
+  position: relative;
+}
+@media only screen and (max-width: 500px) {
+  #dbsummary-content thead tr th#number:before {
+    position: absolute;
+    left: 20px;
+    display: block;
+    overflow: hidden;
+    width: 32%;
+    content: "Summary";
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+}
+#dbsummary-content .wp-list-table {
+  width: 30%;
+  min-width: 350px;
+}
+@media only screen and (max-width: 500px) {
+  #dbsummary-content .wp-list-table {
+    width: 100%;
+    min-width: 100%;
+  }
+}
+#dbsummary-content .wp-list-table #table_size {
+  width: 80px;
+}
+#dbsummary-content .wp-list-table #number,
+#dbsummary-content .wp-list-table td.number {
+  width: 16px;
+  text-align: center;
+}
+@media only screen and (max-width: 782px) {
+  #dbsummary-content .wp-list-table #number,
+  #dbsummary-content .wp-list-table td.number {
+    text-align: left;
+  }
+}
+
+#breeze_loader_function {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6784313725);
+  z-index: 9999;
+  margin: auto;
+  text-align: center;
+}
+#breeze_loader_function:after {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: 40%;
+  margin: auto;
+  content: "Please Do Not Close The Window Until The Process Is Finished.";
+  color: white;
+  font-size: 24px;
+  text-align: center;
+}
+
+#breeze_info {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: 50%;
+  width: 100%;
+  height: 100%;
+  z-index: 10000;
+  color: white;
+  font-size: 24px;
+  text-align: center;
+}
+
+.breeze-ajax-loader {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #FFF;
+  border-radius: 50%;
+  display: inline-block;
+  position: relative;
+  box-sizing: border-box;
+  animation: breeze-rotation 1s linear infinite;
+  top: 5px;
+}
+.breeze-ajax-loader:after {
+  content: "";
+  box-sizing: border-box;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 3px solid;
+  border-color: #11ACDF transparent;
+}
+
+@keyframes breeze-rotation {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }

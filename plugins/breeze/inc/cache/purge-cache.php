@@ -27,10 +27,47 @@ class Breeze_PurgeCache {
 	public function set_action() {
 		add_action( 'pre_post_update', array( $this, 'purge_post_on_update' ), 10, 1 );
 		add_action( 'save_post', array( $this, 'purge_post_on_update' ), 10, 1 );
+		add_action( 'save_post', array( $this, 'purge_post_on_update_content' ), 9, 3 );
 		add_action( 'wp_trash_post', array( $this, 'purge_post_on_update' ), 10, 1 );
+		add_action( 'wp_trash_post', array( $this, 'purge_post_on_trash' ), 9, 1 );
 		add_action( 'comment_post', array( $this, 'purge_post_on_new_comment' ), 10, 3 );
 		add_action( 'wp_set_comment_status', array( $this, 'purge_post_on_comment_status_change' ), 10, 2 );
+		add_action( 'spammed_comment', array( $this, 'purge_post_on_comment_status_change' ), 10, 2 );
+		add_action( 'trashed_comment', array( $this, 'purge_post_on_comment_status_change' ), 10, 2 );
+		add_action( 'edit_comment', array( $this, 'purge_post_on_comment_status_change' ), 10, 2 );
 		add_action( 'set_comment_cookies', array( $this, 'set_comment_cookie_exceptions' ), 10, 2 );
+
+		add_action( 'switch_theme', array( &$this, 'clear_local_cache_on_switch' ), 9, 3 );
+		add_action( 'customize_save_after', array( &$this, 'clear_customizer_cache' ), 11, 1 );
+	}
+
+	/**
+	 * When customizer settings are saved ( Publish button is clicked ), clear all cache.
+	 *
+	 * @param $element
+	 *
+	 * @return void
+	 */
+	public function clear_customizer_cache( $element ) {
+
+		do_action( 'breeze_clear_all_cache' );
+	}
+
+	/**
+	 * Clear local cache on theme switch.
+	 *
+	 * @param $new_name
+	 * @param $new_theme
+	 * @param $old_theme
+	 *
+	 * @return void
+	 */
+	public function clear_local_cache_on_switch( $new_name, $new_theme, $old_theme ) {
+		//delete minify
+		Breeze_MinificationCache::clear_minification();
+		//clear normal cache
+		Breeze_PurgeCache::breeze_cache_flush();
+		//do_action( 'breeze_clear_all_cache' );
 	}
 
 	/**
@@ -65,11 +102,167 @@ class Breeze_PurgeCache {
 		if ( 'tribe_events' === $post_type ) {
 			$do_cache_reset = false;
 		}
+		$clear_wp_cache = true;
+		if ( defined( 'RedisCachePro\Version' ) ) {
+			$clear_wp_cache = false;
+		}
+
+		if ( did_action( 'edit_post' ) ) {
+			return;
+		}
 
 		// File based caching only
 		if ( ! empty( Breeze_Options_Reader::get_option_value( 'breeze-active' ) ) ) {
-			self::breeze_cache_flush( $do_cache_reset );
+			self::breeze_cache_flush( $do_cache_reset, $clear_wp_cache );
 		}
+	}
+
+	/**
+	 * Purge Cloudflare data on post/page/cpt update.
+	 *
+	 * @param int $post_id Post ID.
+	 * @param WP_Post $post Post object.
+	 * @param bool $update Whether this is an existing post being updated.
+	 *
+	 * @return void
+	 * @access public
+	 * @since 2.0.15
+	 */
+	public function purge_post_on_update_content( int $post_id, WP_Post $post, bool $update ) {
+		if ( true === $update ) {
+
+			$post_type = get_post_type( $post_id );
+
+			if ( ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) || 'revision' === $post_type ) {
+				return;
+			} elseif ( ! current_user_can( 'edit_post', $post_id ) && ( ! defined( 'DOING_CRON' ) || ! DOING_CRON ) ) {
+				return;
+			}
+
+			$this->purge_cloudflare_cache( $post_id );
+
+		}
+
+	}
+
+	/**
+	 * Clear cloudflare cache on post/page/cpt delete action.
+	 *
+	 * @param int $post_id Post ID.
+	 *
+	 * @return void
+	 */
+	public function purge_post_on_trash( int $post_id ) {
+		$this->purge_cloudflare_cache( $post_id );
+	}
+
+	private function purge_cloudflare_cache( $post_id ) {
+
+		if ( false === get_permalink( $post_id ) ) {
+			return;
+		}
+		// Reset CloudFlare cache.
+		$get_permalink = get_permalink( $post_id );
+		// On delete action, the permalink has "__trashed" added to the permalink.
+		// We need to remove that.
+		$get_permalink  = str_replace( '__trashed', '', $get_permalink );
+		$list_of_urls   = array();
+		$list_of_urls[] = $get_permalink;
+
+		$noarchive_post_type = array( 'post', 'page' );
+		$this_post_status    = get_post_status( $post_id );
+		$this_post_type      = get_post_type( $post_id );
+		$rest_api_route      = 'wp/v2';
+		$valid_post_status   = array( 'publish', 'private', 'trash' );
+
+		$post_type_object = get_post_type_object( $this_post_type );
+		if ( isset( $post_type_object->rest_base ) && ! empty( $post_type_object->rest_base ) ) {
+			$rest_permalink = get_rest_url() . $rest_api_route . '/' . $post_type_object->rest_base . '/' . $post_id . '/';
+		} elseif ( 'post' === $this_post_type ) {
+			$rest_permalink = get_rest_url() . $rest_api_route . '/posts/' . $post_id . '/';
+		} elseif ( 'page' === $this_post_type ) {
+			$rest_permalink = get_rest_url() . $rest_api_route . '/views/' . $post_id . '/';
+		}
+		if ( isset( $rest_permalink ) ) {
+			$list_of_urls[] = $rest_permalink;
+		}
+
+		// Add in AMP permalink if Automattic's AMP is installed
+		if ( function_exists( 'amp_get_permalink' ) ) {
+			$list_of_urls[] = amp_get_permalink( $post_id );
+			// Regular AMP url for posts
+			$list_of_urls[] = get_permalink( $post_id ) . 'amp/';
+		}
+		if ( 'trash' === $this_post_status ) {
+			$list_of_urls[] = $get_permalink . 'feed/';
+		}
+
+		$author_id = get_post_field( 'post_author', $post_id );
+		array_push(
+			$list_of_urls,
+			get_author_posts_url( $author_id ),
+			get_author_feed_link( $author_id ),
+			get_rest_url() . $rest_api_route . '/users/' . $author_id . '/'
+		);
+
+		$categories = get_the_category( $post_id );
+		if ( $categories ) {
+			foreach ( $categories as $cat ) {
+				array_push(
+					$list_of_urls,
+					get_category_link( $cat->term_id ),
+					get_rest_url() . $rest_api_route . '/categories/' . $cat->term_id . '/'
+				);
+			}
+		}
+
+		$tags = get_the_tags( $post_id );
+		if ( $tags ) {
+			foreach ( $tags as $tag ) {
+				array_push(
+					$list_of_urls,
+					get_tag_link( $tag->term_id ),
+					get_rest_url() . $rest_api_route . '/tags/' . $tag->term_id . '/'
+				);
+			}
+		}
+
+		// Archives and their feeds
+		if ( $this_post_type && ! in_array( $this_post_type, $noarchive_post_type, true ) ) {
+			$get_archive_link      = get_post_type_archive_link( get_post_type( $post_id ) );
+			$get_archive_feed_link = get_post_type_archive_feed_link( get_post_type( $post_id ) );
+			if ( ! empty( $get_archive_link ) ) {
+				$list_of_urls[] = $get_archive_link;
+			}
+			if ( ! empty( $get_archive_feed_link ) ) {
+				$list_of_urls[] = $get_archive_feed_link;
+			}
+		}
+
+		// Feeds
+		array_push(
+			$list_of_urls,
+			get_bloginfo_rss( 'rdf_url' ),
+			get_bloginfo_rss( 'rss_url' ),
+			get_bloginfo_rss( 'rss2_url' ),
+			get_bloginfo_rss( 'atom_url' ),
+			get_bloginfo_rss( 'comments_rss2_url' ),
+			get_post_comments_feed_link( $post_id )
+		);
+		// Home Pages and (if used) posts page
+		array_push(
+			$list_of_urls,
+			get_rest_url(),
+			home_url() . '/'
+		);
+		if ( 'page' === get_option( 'show_on_front' ) ) {
+			// Ensure we have a page_for_posts setting to avoid empty URL
+			if ( get_option( 'page_for_posts' ) ) {
+				$list_of_urls[] = get_permalink( get_option( 'page_for_posts' ) );
+			}
+		}
+
+		Breeze_CloudFlare_Helper::purge_cloudflare_cache_urls( $list_of_urls );
 	}
 
 	public function purge_post_on_new_comment( $comment_ID, $approved, $commentdata ) {
@@ -79,6 +272,8 @@ class Breeze_PurgeCache {
 		// File based caching only
 		if ( ! empty( Breeze_Options_Reader::get_option_value( 'breeze-active' ) ) ) {
 			$post_id = $commentdata['comment_post_ID'];
+
+			Breeze_CloudFlare_Helper::purge_cloudflare_cache_urls( array( get_permalink( $post_id ) ) );
 
 			global $wp_filesystem;
 
@@ -108,6 +303,8 @@ class Breeze_PurgeCache {
 
 				$url_path = get_permalink( $post_id );
 
+				Breeze_CloudFlare_Helper::purge_cloudflare_cache_urls( array( $url_path ) );
+
 				if ( $wp_filesystem->exists( breeze_get_cache_base_path() . md5( $url_path ) ) ) {
 					$wp_filesystem->rmdir( breeze_get_cache_base_path() . md5( $url_path ), true );
 				}
@@ -115,10 +312,19 @@ class Breeze_PurgeCache {
 		}
 	}
 
-	//clean cache
-	public static function breeze_cache_flush( $flush_cache = true ) {
+	/**
+	 * Clear Breeze & Wordpress Cache
+	 *
+	 * @param $flush_cache
+	 * @param $clear_ocp
+	 *
+	 * @return void
+	 */
+	public static function breeze_cache_flush( $flush_cache = true, $clear_ocp = true ) {
 		global $wp_filesystem, $post;
-
+		if ( true === Breeze_CloudFlare_Helper::is_log_enabled() ) {
+			error_log( '######### PURGE LOCAL CACHE HTML ###: ' . var_export( 'true', true ) );
+		}
 		require_once( ABSPATH . 'wp-admin/includes/file.php' );
 
 		WP_Filesystem();
@@ -130,7 +336,11 @@ class Breeze_PurgeCache {
 			$post_type = get_post_type( $post->ID );
 
 			$flush_cache = true;
-			if ( 'tribe_events' === $post_type ) {
+			$ignore_object_cache = array(
+				'tribe_events',
+				'shop_order',
+			);
+			if ( in_array( $post_type, $ignore_object_cache ) ) {
 				$flush_cache = false;
 			}
 		}
@@ -139,7 +349,10 @@ class Breeze_PurgeCache {
 			$flush_cache = false;
 		}
 
-		if ( function_exists( 'wp_cache_flush' ) && true === $flush_cache ) {
+		if ( function_exists( 'wp_cache_flush' ) && true === $flush_cache && true === $clear_ocp  ) {
+			if ( true === Breeze_CloudFlare_Helper::is_log_enabled() ) {
+				error_log( '######### PURGE OBJECT CACHE ###: ' . var_export( 'true', true ) );
+			}
 			#if ( ! defined( 'RedisCachePro\Version' ) && ! defined( 'WP_REDIS_VERSION' ) ) {
 				wp_cache_flush();
 			#}

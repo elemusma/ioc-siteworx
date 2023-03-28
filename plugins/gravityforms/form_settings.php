@@ -279,61 +279,9 @@ class GFFormSettings {
 				'title'  => esc_html__( 'Form Button', 'gravityforms' ),
 				'fields' => array(
 					array(
-						'name'          => 'buttonType',
-						'label'         => esc_html__( 'Input Type', 'gravityforms' ),
-						'type'          => 'radio',
-						'default_value' => 'text',
-						'horizontal'    => true,
-						'choices'       => array(
-							array(
-								'label' => esc_html__( 'Text', 'gravityforms' ),
-								'value' => 'text',
-							),
-							array(
-								'label' => esc_html__( 'Image', 'gravityforms' ),
-								'value' => 'image',
-							),
-						),
-					),
-					array(
-						'name'       => 'buttonText',
-						'type'       => 'text',
-						'label'      => esc_html__( 'Button Text', 'gravityforms' ),
-						'tooltip'    => gform_tooltip( 'form_button_text', '', true ),
-						'dependency' => array(
-							'live'   => true,
-							'fields' => array(
-								array(
-									'field'  => 'buttonType',
-									'values' => array( 'text' ),
-								),
-							),
-						),
-					),
-					array(
-						'name'       => 'buttonImageURL',
-						'type'       => 'text',
-						'label'      => esc_html__( 'Button Image URL', 'gravityforms' ),
-						'tooltip'    => gform_tooltip( 'form_button_image', '', true ),
-						'dependency' => array(
-							'live'   => true,
-							'fields' => array(
-								array(
-									'field'  => 'buttonType',
-									'values' => array( 'image' ),
-								),
-							),
-						),
-					),
-					array(
-						'name'        => 'form_button_conditional_logic',
-						'label'       => esc_html__( 'Conditional Logic', 'gravityforms ' ),
-						'type'        => 'conditional_logic',
-						'object_type' => 'form_button',
-						'checkbox'    => array(
-							'label'  => esc_html__( 'Enable conditional logic', 'gravityforms' ),
-							'hidden' => false,
-						),
+						'name' => 'deprecated',
+						'type' => 'html',
+						'html' => esc_html__( 'Form button settings are now located in the form editor! To edit the button settings, go to the form editor and click on the submit button.', 'gravityforms' ),
 					),
 				),
 			),
@@ -349,7 +297,7 @@ class GFFormSettings {
 						'name'          => 'saveButtonText',
 						'type'          => 'text',
 						'label'         => esc_html__( 'Link Text', 'gravityforms' ),
-						'default_value' => __( 'Save and Continue Later', 'gravityforms' ),
+						'default_value' => __( 'Save & Continue', 'gravityforms' ),
 						'dependency'    => array(
 							'live'   => true,
 							'fields' => array(
@@ -547,8 +495,33 @@ class GFFormSettings {
 					array(
 						'name'    => 'enableHoneypot',
 						'type'    => 'toggle',
-						'label'   => __( 'Anti-spam honeypot', 'gravityforms' ),
+						'label'   => esc_html__( 'Anti-spam honeypot', 'gravityforms' ),
 						'tooltip' => gform_tooltip( 'form_honeypot', '', true ),
+					),
+					array(
+						'name'          => 'honeypotAction',
+						'type'          => 'radio',
+						'default_value' => 'abort',
+						'horizontal'    => true,
+						'label'         => esc_html__( 'If the honeypot flags a submission as spam:', 'gravityforms' ),
+						'dependency'    => array(
+							'live'   => true,
+							'fields' => array(
+								array(
+									'field' => 'enableHoneypot',
+								),
+							),
+						),
+						'choices'       => array(
+							array(
+								'label' => esc_html__( 'Do not create an entry', 'gravityforms' ),
+								'value' => 'abort',
+							),
+							array(
+								'label' => esc_html__( 'Create an entry and mark it as spam', 'gravityforms' ),
+								'value' => 'spam',
+							),
+						),
 					),
 					array(
 						'name'    => 'enableAnimation',
@@ -674,12 +647,6 @@ class GFFormSettings {
 					$form['customRequiredIndicator'] = rgar( $values, 'customRequiredIndicator' );
 					$form['cssClass']                = rgar( $values, 'cssClass' );
 
-					// Form Button
-					$form['button']['type']             = GFCommon::whitelist( rgar( $values, 'buttonType' ), array( 'text', 'image' ) );
-					$form['button']['text']             = rgar( $values, 'buttonText' );
-					$form['button']['imageUrl']         = rgar( $values, 'buttonImageURL' );
-					$form['button']['conditionalLogic'] = rgar( $values, 'form_button_conditional_logic' ) ? rgar( $values, 'form_button_conditional_logic_object' ) : null;
-
 					// Save and Continue
 					$form['save']['enabled']        = (bool) rgar( $values, 'saveEnabled' );
 					$form['save']['button']['type'] = 'link';
@@ -710,6 +677,7 @@ class GFFormSettings {
 
 					// Form Options
 					$form['enableHoneypot']  = (bool) rgar( $values, 'enableHoneypot' );
+					$form['honeypotAction']  = GFCommon::whitelist( rgar( $values, 'honeypotAction' ), array( 'abort', 'spam' ) );
 					$form['enableAnimation'] = (bool) rgar( $values, 'enableAnimation' );
 					$form['markupVersion']   = rgar( $values, 'markupVersion' ) ? 1 : 2;
 
@@ -986,13 +954,18 @@ class GFFormSettings {
 							continue;
 						}
 
-						$query = array( 'subview' => $tab['name'] );
+						$query = array(
+							'subview' => $tab['name'],
+							'page'    => rgget( 'page' ),
+							'id'      => rgget( 'id' ),
+							'view'    => rgget( 'view' ),
+						);
 
 						if ( isset( $tab['query'] ) ) {
 							$query = array_merge( $query, $tab['query'] );
 						}
 
-						$url = add_query_arg( $query );
+						$url = add_query_arg( $query, admin_url( 'admin.php' ) );
 
 						// Get tab icon.
 						$icon_markup = GFCommon::get_icon_markup( $tab, 'gform-icon--cog' );

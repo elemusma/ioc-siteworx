@@ -8,7 +8,7 @@ require_once dirname( __FILE__ ) . '/../../protect/wp/ipstore.php';
 class BVIPStoreCallback extends BVCallbackBase {
 	public $db;
 
-	const IPSTORE_WING_VERSION = 1.0;
+	const IPSTORE_WING_VERSION = 1.1;
 
 	public function __construct($callback_handler) {
 		$this->db = $callback_handler->db;
@@ -50,7 +50,7 @@ class BVIPStoreCallback extends BVCallbackBase {
 	}
 
 	public function getIPs($table, $auto_increment_offset, $type, $category) {
-		$query = "SELECT `start_ip_range` FROM $table WHERE id < $auto_increment_offset AND `type` = $type AND ";
+		$query = "SELECT `start_ip_range` FROM $table WHERE id < $auto_increment_offset AND `type` in (" . implode(',', $type) . ") AND ";
 		$query .= ($category == BVIPStore::FW) ? "`is_fw` = true;" : "`is_lp` = true;";
 		return $this->db->getCol($query);
 	}
@@ -63,10 +63,10 @@ class BVIPStoreCallback extends BVCallbackBase {
 	public function getIPStoreInfo($table, $auto_increment_offset) {
 			$db = $this->db;
 			$info = array();
-			$info['fw_blacklisted_ips'] = $this->getIPs($table, $auto_increment_offset, BVIPStore::BLACKLISTED, BVIPStore::FW);
-			$info['lp_blacklisted_ips'] = $this->getIPs($table, $auto_increment_offset, BVIPStore::BLACKLISTED, BVIPStore::LP);
-			$info['fw_whitelisted_ips'] = $this->getIPs($table, $auto_increment_offset, BVIPStore::WHITELISTED, BVIPStore::FW);
-			$info['lp_whitelisted_ips'] = $this->getIPs($table, $auto_increment_offset, BVIPStore::WHITELISTED, BVIPStore::LP);
+			$info['fw_blacklisted_ips'] = $this->getIPs($table, $auto_increment_offset, BVIPStore::blacklistedTypes(), BVIPStore::FW);
+			$info['lp_blacklisted_ips'] = $this->getIPs($table, $auto_increment_offset, BVIPStore::blacklistedTypes(), BVIPStore::LP);
+			$info['fw_whitelisted_ips'] = $this->getIPs($table, $auto_increment_offset, BVIPStore::whitelistedTypes(), BVIPStore::FW);
+			$info['lp_whitelisted_ips'] = $this->getIPs($table, $auto_increment_offset, BVIPStore::whitelistedTypes(), BVIPStore::LP);
 			$info['ip_store_offset'] = $this->getIPStoreOffset($table, $auto_increment_offset);
 			$info['country_ips_size'] = intval($db->getVar("SELECT COUNT(id) FROM $table WHERE id >= $auto_increment_offset"));
 			return $info;

@@ -16,6 +16,7 @@ class BVFWConfig {
 	public $cookieDomain;
 	public $loggingMode;
 	public $rulesMode;
+	public $isGeoBlocking;
 
 	public static $requests_table = 'fw_requests';
 	public static $roleLevels = array(
@@ -40,6 +41,7 @@ class BVFWConfig {
 		$this->canSetCachePreventionCookie = array_key_exists('cansetcachepreventioncookie', $confHash) ?
 				$confHash['cansetcachepreventioncookie'] : false;
 		$this->rulesMode = array_key_exists('rulesmode', $confHash) ? intval($confHash['rulesmode']) : BVFWConfig::DISABLED;
+		$this->isGeoBlocking = array_key_exists('isgeoblocking', $confHash) ? $confHash['isgeoblocking'] : false;
 	}
 	
 	#mode

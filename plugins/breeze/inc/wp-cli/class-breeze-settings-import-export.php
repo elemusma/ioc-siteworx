@@ -404,6 +404,14 @@ class Breeze_Settings_Import_Export {
 				'breeze-ttl'              => ( isset( $options['breeze-ttl'] ) ? $options['breeze-ttl'] : 1440 ),
 			);
 
+			$is_minification_js        = ( isset( $options['breeze-minify-js'] ) ? $options['breeze-minify-js'] : '0' );
+			$is_inline_minification_js = ( isset( $options['breeze-include-inline-js'] ) ? $options['breeze-include-inline-js'] : '0' );
+			$is_group_js               = ( isset( $options['breeze-group-js'] ) ? $options['breeze-group-js'] : '0' );
+
+			if ( 0 === absint( $is_minification_js ) || 0 === absint( $is_inline_minification_js ) ) {
+			//	$is_group_js = '0';
+			}
+
 			$file = array(
 				'breeze-minify-html'        => ( isset( $options['breeze-minify-html'] ) ? $options['breeze-minify-html'] : '0' ),
 				// --
@@ -413,9 +421,9 @@ class Breeze_Settings_Import_Export {
 				'breeze-exclude-css'        => ( isset( $options['breeze-exclude-css'] ) ? $options['breeze-exclude-css'] : array() ),
 				'breeze-include-inline-css' => ( isset( $options['breeze-include-inline-css'] ) ? $options['breeze-include-inline-css'] : '0' ),
 				// --
-				'breeze-minify-js'          => ( isset( $options['breeze-minify-js'] ) ? $options['breeze-minify-js'] : '0' ),
-				'breeze-group-js'           => ( isset( $options['breeze-group-js'] ) ? $options['breeze-group-js'] : '0' ),
-				'breeze-include-inline-js'  => ( isset( $options['breeze-include-inline-js'] ) ? $options['breeze-include-inline-js'] : '0' ),
+				'breeze-minify-js'          => $is_minification_js,
+				'breeze-group-js'           => $is_group_js,
+				'breeze-include-inline-js'  => $is_inline_minification_js,
 				'breeze-exclude-js'         => ( isset( $options['breeze-exclude-js'] ) ? $options['breeze-exclude-js'] : array() ),
 				'breeze-move-to-footer-js'  => ( isset( $options['breeze-move-to-footer-js'] ) ? $options['breeze-move-to-footer-js'] : array() ),
 				'breeze-defer-js'           => ( isset( $options['breeze-defer-js'] ) ? $options['breeze-defer-js'] : array() ),

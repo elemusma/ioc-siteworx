@@ -16,6 +16,7 @@ if (!class_exists('BVWPActLog')) :
 			$this->bvinfo = $info;
 			$this->request_id = MCInfo::getRequestID();
 			$this->ip_header = array_key_exists('ip_header', $config) ? $config['ip_header'] : false;
+			$this->ignored_events = array_key_exists('ignored_events', $config) ? $config['ignored_events'] : array();
 		}
 
 		function init() {
@@ -62,6 +63,7 @@ if (!class_exists('BVWPActLog')) :
 			if (!empty($user)) {
 				$data['username'] = $user->user_login;
 				$data['email'] = $user->user_email;
+				$data['role'] = $user->roles;
 			}
 			return $data;
 		}
@@ -144,6 +146,25 @@ if (!class_exists('BVWPActLog')) :
 			$this->db->replaceIntoBVTable(BVWPActLog::$actlog_table, $values);
 		}
 
+		function is_key_ignored($ignored_keys, $value) {
+			$is_ignored = false;
+			if (array_key_exists("post_types_regex", $ignored_keys)) {
+				foreach ($ignored_keys['post_types_regex'] as $val) {
+					if (preg_match($val, $value)) {
+						return true;
+					}
+				}
+			}
+			if (array_key_exists("post_types", $ignored_keys)) {
+				foreach ($ignored_keys['post_types'] as $val) {
+					if ($val == $value) {
+						return true;
+					}
+				}
+			}
+			return $is_ignored;
+		}
+
 		function user_login_handler($user_login, $user) {
 			$event_data = array("user" => $this->get_user($user->ID));
 			$this->add_activity($event_data);
@@ -185,6 +206,8 @@ if (!class_exists('BVWPActLog')) :
 
 		function post_handler($post_id) {
 			$post = $this->get_post($post_id);
+			if ($this->is_key_ignored($this->ignored_events, $post["type"]))
+				return;
 			$event_data = array();
 			if ($post["type"] === "product") {
 				$event_data["product"] = $post;
@@ -198,6 +221,8 @@ if (!class_exists('BVWPActLog')) :
 
 		function post_saved_handler($post_id, $post, $update) {
 			$post = $this->get_post($post_id);
+			if ($this->is_key_ignored($this->ignored_events, $post["type"]))
+				return;
 			$event_data = array();
 			if ($post["type"] === "product") {
 				$event_data["product"] = $post;
@@ -376,19 +401,22 @@ if (!class_exists('BVWPActLog')) :
 		}
 
 		function get_update_data($options) {
-			global $wp_version;
 			$event_data = array('action' => 'update');
 			if ($options['type'] === 'plugin') {
 				$event_data['type'] = 'plugin';
+				if (array_key_exists("plugin", $options)) {
+					$options['plugins'] = array($options['plugin']);
+					unset($options['plugin']);
+				}
 				$event_data['plugins'] = $this->get_plugin_update_data($options['plugins']);
 			}
 			else if ($options['type'] === 'theme') {
 				$event_data['type'] = 'theme';
+				if (array_key_exists("theme", $options)) {
+				  $options['themes'] = array($options['theme']);
+					unset($options['theme']);
+				}
 				$event_data['themes'] = $this->get_theme_update_data($options['themes']);
-			}
-			else if ($options['type'] === 'core') {
-				$event_data['type'] = 'core';
-				$event_data['wp_core'] = array('prev_version' => $wp_version);
 			}
 			return $event_data;
 		}
@@ -409,10 +437,21 @@ if (!class_exists('BVWPActLog')) :
 		function upgrade_handler($upgrader, $data) {
 			$event_data = array();
 			if ($data['action'] === 'update') {
+				if ('core' === $data['type']) {
+					return;
+				}
 				$event_data = $this->get_update_data($data);
 			} else if ($data['action'] === 'install') {
 				$event_data = $this->get_install_data($upgrader, $data);
 			}
+			$this->add_activity($event_data);
+		}
+
+		function core_upgrade_handler($new_wp_version) {
+			global $wp_version;
+			$event_data = array();
+			$event_data['type'] = 'core';
+			$event_data['wp_core'] = array('prev_version' => $wp_version, 'new_version' => $new_wp_version);
 			$this->add_activity($event_data);
 		}
 
@@ -463,6 +502,7 @@ if (!class_exists('BVWPActLog')) :
 
 			/* SENSOR FOR PLUGIN, THEME, WPCORE UPGRADES */
 			add_action('upgrader_process_complete', array($this, 'upgrade_handler'), 10, 2);
+			add_action('_core_updated_successfully', array($this, 'core_upgrade_handler'), 10, 1);
 
 			/* SENSORS FOR WOOCOMMERCE EVENTS */
 			add_action('woocommerce_attribute_added', array($this, 'woocommerce_attribute_created_handler'), 10, 2);

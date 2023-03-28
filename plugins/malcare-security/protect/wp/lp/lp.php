@@ -31,6 +31,7 @@ class BVWPLP {
 	const BLACKLISTED  = 5;
 	const BYPASSED     = 6;
 	const ALLOWED      = 7;
+	const PRIVATEIP    = 8;
 	
 	public function __construct($db, $settings, $ip, $ipstore, $confHash) {
 		$this->db = $db;
@@ -199,6 +200,8 @@ class BVWPLP {
 			$failed_attempts = $this->getLoginCount(BVWPLP::LOGINFAILURE, $this->ip, $this->getFailedLoginGap());
 			if ($this->isWhitelistedIP()) {
 				$this->setCategory(BVWPLP::BYPASSED);
+			} else if (BVProtectBase::isPrivateIP($this->ip)) {
+				$this->setCategory(BVWPLP::PRIVATEIP);
 			} else if ($this->isBlacklistedIP()) {
 				$this->setCategory(BVWPLP::BLACKLISTED);
 				$this->terminateLogin();

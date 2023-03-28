@@ -25,7 +25,7 @@ class Breeze_MinificationCache {
 			$this->filename = BREEZE_CACHEFILE_PREFIX . $md5 . '.php';
 		} else {
 			if ( in_array( $ext, array( 'js', 'css' ) ) ) {
-				$this->filename = $ext . '/' . BREEZE_CACHEFILE_PREFIX . $md5 . breeze_currency_switcher_cache() .'.' . $ext;
+				$this->filename = $ext . '/' . BREEZE_CACHEFILE_PREFIX . $md5 . breeze_currency_switcher_cache() . '.' . $ext;
 			} else {
 				$this->filename = '/' . BREEZE_CACHEFILE_PREFIX . $md5 . '.' . $ext;
 			}
@@ -38,7 +38,7 @@ class Breeze_MinificationCache {
 	}
 
 	public function get_file_name() {
-		return  $this->filename;
+		return $this->filename;
 	}
 
 	public function check() {
@@ -234,7 +234,10 @@ class Breeze_MinificationCache {
 		return true;
 	}
 
-	public static function clear_minification() {
+	public static function clear_minification( $blog_id = null ) {
+		if ( true === Breeze_CloudFlare_Helper::is_log_enabled() ) {
+			error_log( '######### PURGE LOCAL CACHE MINIFICATION; ###: ' . var_export( 'true', true ) );
+		}
 		if ( is_multisite() && is_network_admin() ) {
 			$sites = get_sites(
 				array(
@@ -247,11 +250,11 @@ class Breeze_MinificationCache {
 				restore_current_blog();
 			}
 		} else {
-			self::clear_site_minification();
+			self::clear_site_minification( $blog_id );
 		}
 	}
 
-	public static function clear_site_minification() {
+	public static function clear_site_minification( $blog_id_custom = null ) {
 		if ( ! isset( $_GET['breeze_purge'] ) && ! Breeze_MinificationCache::create_cache_minification_folder() ) {
 			return false;
 		}
@@ -261,7 +264,11 @@ class Breeze_MinificationCache {
 		$cache_folders = breeze_all_user_folders();
 
 		if ( is_multisite() ) {
-			$blog_id = get_current_blog_id();
+			if ( is_null( $blog_id_custom ) ) {
+				$blog_id = absint( $blog_id_custom );
+			} else {
+				$blog_id = get_current_blog_id();
+			}
 			// scan the cachedirs
 			foreach ( $cache_folders as $user_folder ) {
 				foreach ( array( '', 'js', 'css' ) as $scandirName ) {
@@ -291,7 +298,10 @@ class Breeze_MinificationCache {
 					$thisAoCacheDir = rtrim( BREEZE_MINIFICATION_CACHE . $blog_id . '/' . ( ! empty( $user_folder ) ? $user_folder . '/' : '' ) . $scandirName, '/' ) . '/';
 
 					foreach ( $scanneddir as $file ) {
-						if ( ! in_array( $file, array( '.', '..' ) ) && ( strpos( $file, 'lock' ) !== false || strpos( $file, BREEZE_CACHEFILE_PREFIX ) !== false ) && is_file( $thisAoCacheDir . $file ) ) {
+						if ( ! in_array( $file, array(
+								'.',
+								'..'
+							) ) && ( strpos( $file, 'lock' ) !== false || strpos( $file, BREEZE_CACHEFILE_PREFIX ) !== false ) && is_file( $thisAoCacheDir . $file ) ) {
 							@unlink( $thisAoCacheDir . $file );
 						}
 					}
@@ -330,7 +340,10 @@ class Breeze_MinificationCache {
 					$thisAoCacheDir = rtrim( BREEZE_MINIFICATION_CACHE . ( ! empty( $user_folder ) ? $user_folder . '/' : '' ) . $scandirName, '/' ) . '/';
 
 					foreach ( $scanneddir as $file ) {
-						if ( ! in_array( $file, array( '.', '..' ) ) && ( strpos( $file, 'lock' ) !== false || strpos( $file, BREEZE_CACHEFILE_PREFIX ) !== false ) && is_file( $thisAoCacheDir . $file ) ) {
+						if ( ! in_array( $file, array(
+								'.',
+								'..'
+							) ) && ( strpos( $file, 'lock' ) !== false || strpos( $file, BREEZE_CACHEFILE_PREFIX ) !== false ) && is_file( $thisAoCacheDir . $file ) ) {
 							@unlink( $thisAoCacheDir . $file );
 						}
 					}

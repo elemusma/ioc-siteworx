@@ -8,23 +8,23 @@
 <section id="list-features">
 	<div class="custom-container">
 		<div class="heading text-center">
-		<h5><?php echo $heading; ?></h5>
-		<h4><?php echo $subheading; ?></h4>
+		<h5><?php echo esc_html($heading); ?></h5>
+		<h4><?php echo esc_html($subheading); ?></h4>
 		</div>
 		<div class="row">
 			<div class="col-xs-12 d-flex">
-				<div class="col-xs-12 col-lg-6">
+				<div class="col-xs-12 col-lg-6 px-3">
 					<div>
-						<img class="main-image" src="<?php echo $img_url; ?>"/>
+						<img class="main-image" src="<?php echo esc_url($img_url); ?>"/>
 					</div>
 				 <div class="text-center intro-video d-flex"> 
-				 <a href="<?php echo $intro_video_url; ?>" target="_blank" rel="noopener noreferrer">
-							<img src="<?php echo plugins_url("/../../img/play-video.png", __FILE__); ?>"/>
-								&nbsp;Watch the <?php echo $brand_name; ?> Video
+				 <a href="<?php echo esc_url($intro_video_url); ?>" target="_blank" rel="noopener noreferrer">
+							<img src="<?php echo esc_url(plugins_url("/../../img/play-video.png", __FILE__)); ?>"/>
+								&nbsp;Watch the <?php echo esc_html($brand_name); ?> Video
 						</a> 
 					</div>
 				</div>
-				<div class="col-xs-12 col-lg-6 d-flex">
+				<div class="col-xs-12 col-lg-6 d-flex px-3">
 					<div id="accordion">
 						<div>
 							<input type="radio" name="accordion-group" id="option-1" checked />

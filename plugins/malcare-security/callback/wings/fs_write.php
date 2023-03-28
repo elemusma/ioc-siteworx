@@ -310,7 +310,7 @@ class BVFSWriteCallback extends BVCallbackBase {
 		}
 
 		if (fwrite($fp, $content) === false) {
-			$resp['error'] = "UNABLE_TO_WRITE_TO_TMP_OFILE";
+			$result['error'] = "UNABLE_TO_WRITE_TO_TMP_OFILE";
 		}
 		fclose($fp);
 

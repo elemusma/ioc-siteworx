@@ -52,7 +52,7 @@ class MCWPAdmin {
 		if (array_key_exists('bvnonce', $_REQUEST) &&
 				wp_verify_nonce($_REQUEST['bvnonce'], "bvnonce") &&
 				array_key_exists('blogvaultkey', $_REQUEST) &&
-				(strlen($_REQUEST['blogvaultkey']) == 64) &&
+				(strlen(MCAccount::sanitizeKey($_REQUEST['blogvaultkey'])) == 64) &&
 				(array_key_exists('page', $_REQUEST) &&
 				$_REQUEST['page'] == $this->bvinfo->plugname)) {
 			$keys = str_split($_REQUEST['blogvaultkey'], 32);
@@ -67,34 +67,15 @@ class MCWPAdmin {
 		}
 		if ($this->bvinfo->isActivateRedirectSet()) {
 			$this->settings->updateOption($this->bvinfo->plug_redirect, 'no');
+			##ACTIVATEREDIRECTCODE##
 			wp_redirect($this->mainUrl());
 		}
 	}
 
 	public function mcsecAdminMenu($hook) {
 		if ($hook === 'toplevel_page_malcare' || preg_match("/bv_add_account$/", $hook) || preg_match("/bv_account_details$/", $hook)) {
-			wp_enqueue_style( 'mcsurface', plugins_url('css/bvmui.min.css', __FILE__));
-			wp_enqueue_style( 'bvnew', plugins_url('css/bvnew.min.css', __FILE__));
-		}
-	}
-
-	public function enqueueBootstrapCSS() {
-		wp_enqueue_style( 'bootstrap', plugins_url('css/bootstrap.min.css', __FILE__));
-	}
-
-	public function showErrors() {
-		$error = NULL;
-		if (isset($_REQUEST['error'])) {
-			$error = $_REQUEST['error'];
-			$open_tag = '<div style="padding-bottom:0.5px;color:#ffaa0d;text-align:center"><p style="font-size:16px;">';
-			$close_tag = '</p></div>';
-			if ($error == "email") {
-				echo  $open_tag.'Please enter email in the correct format.'.$close_tag;
-			}
-			else if (($error == "custom") && isset($_REQUEST['bvnonce']) && wp_verify_nonce($_REQUEST['bvnonce'], "bvnonce")
-				&& isset($_REQUEST['message'])) {
-				echo $open_tag.nl2br(esc_html(base64_decode($_REQUEST['message']))).$close_tag;
-			}
+			wp_enqueue_style( 'bootstrap', plugins_url('css/bootstrap.min.css', __FILE__));
+			wp_enqueue_style( 'bvplugin', plugins_url('css/bvplugin.min.css', __FILE__));
 		}
 	}
 
@@ -104,7 +85,8 @@ class MCWPAdmin {
 		add_submenu_page(null, 'Malcare', 'Malcare', 'manage_options', 'bv_account_details',
 			array($this, 'showAccountDetailsPage'));
 
-		if (!$this->bvinfo->canSetCWBranding()) {
+		$brand = $this->bvinfo->getBrandInfo();
+		if (!$this->bvinfo->canSetCWBranding() && (!is_array($brand) || (!array_key_exists('hide', $brand) && !array_key_exists('hide_from_menu', $brand)))) {
 			$bname = $this->bvinfo->getBrandName();
 			$icon = $this->bvinfo->getBrandIcon();
 
@@ -118,11 +100,22 @@ class MCWPAdmin {
 		}
 	}
 
+	public function hidePluginUpdate($plugins) {
+		$brand = $this->bvinfo->getBrandInfo();
+		$bvslug = $this->bvinfo->slug;
+		if (isset($plugins->response[$bvslug]) && is_array($brand)) {
+			if (array_key_exists('hide_from_menu', $brand) || array_key_exists('hide', $brand)) {
+				unset($plugins->response[$bvslug]);
+			}
+		}
+		return $plugins;
+	}
+
 	public function hidePluginDetails($plugin_metas, $slug) {
 		$brand = $this->bvinfo->getBrandInfo();
 		$bvslug = $this->bvinfo->slug;
 
-		if ($slug === $bvslug && $brand && array_key_exists('hide_plugin_details', $brand)){
+		if ($slug === $bvslug && is_array($brand) && array_key_exists('hide_plugin_details', $brand)) {
 			foreach ($plugin_metas as $pluginKey => $pluginValue) {
 				if (strpos($pluginValue, sprintf('>%s<', translate('View details')))) {
 					unset($plugin_metas[$pluginKey]);
@@ -133,14 +126,46 @@ class MCWPAdmin {
 		return $plugin_metas;
 	}
 
+	public function handlePluginHealthInfo($plugins) {
+		$brand = $this->bvinfo->getBrandInfo();
+		$title = $this->bvinfo->title;
+		if (!isset($plugins["wp-plugins-active"]) ||
+			!isset($plugins["wp-plugins-active"]["fields"]) ||
+			!isset($plugins["wp-plugins-active"]["fields"][$title])) {
+			return $plugins;
+		}
+		if (is_array($brand)) {
+			if (array_key_exists('hide', $brand)) {
+				unset($plugins["wp-plugins-active"]["fields"][$title]);
+			} else {
+				$plugin = $plugins["wp-plugins-active"]["fields"][$title];
+				$author = $this->bvinfo->author;
+				if (array_key_exists('name', $brand)) {
+					$plugin["label"] = $brand['name'];
+				}
+				if (array_key_exists('author', $brand)) {
+					$plugin["value"] = str_replace($author, $brand['author'], $plugin["value"]);
+				}
+				if (array_key_exists('description', $brand)) {
+					$plugin["debug"] = str_replace($author, $brand['author'], $plugin["debug"]);
+				}
+				$plugins["wp-plugins-active"]["fields"][$title] = $plugin;
+			}
+		}
+		return $plugins;
+	}
+
 	public function settingsLink($links, $file) {
 		#XNOTE: Fix this
 		if ( $file == plugin_basename( dirname(__FILE__).'/malcare.php' ) ) {
 			if (!$this->bvinfo->canSetCWBranding()) {
-				$settings_link = '<a href="'.$this->mainUrl().'">'.__( 'Settings' ).'</a>';
-				array_unshift($links, $settings_link);
-				$account_details = '<a href="'.$this->mainUrl('&account_details=true').'">'.__( 'Account Details' ).'</a>';
-				array_unshift($links, $account_details);
+				$brand = $this->bvinfo->getBrandInfo();
+				if (!is_array($brand) || !array_key_exists('hide_from_menu', $brand)) {
+					$settings_link = '<a href="'.$this->mainUrl().'">'.__( 'Settings' ).'</a>';
+					array_unshift($links, $settings_link);
+					$account_details = '<a href="'.$this->mainUrl('&account_details=true').'">'.__( 'Account Details' ).'</a>';
+					array_unshift($links, $account_details);
+				}
 			}
 		}
 		return $links;
@@ -157,20 +182,20 @@ class MCWPAdmin {
 	public function siteInfoTags() {
 		require_once dirname( __FILE__ ) . '/recover.php';
 		$bvnonce = wp_create_nonce("bvnonce");
-		$secret = MCRecover::defaultSecret($this->settings);
 		$public = MCAccount::getApiPublicKey($this->settings);
-		$tags = "<input type='hidden' name='url' value='".$this->siteinfo->wpurl()."'/>\n".
-				"<input type='hidden' name='homeurl' value='".$this->siteinfo->homeurl()."'/>\n".
-				"<input type='hidden' name='siteurl' value='".$this->siteinfo->siteurl()."'/>\n".
-				"<input type='hidden' name='dbsig' value='".$this->siteinfo->dbsig(false)."'/>\n".
-				"<input type='hidden' name='plug' value='".$this->bvinfo->plugname."'/>\n".
-				"<input type='hidden' name='adminurl' value='".$this->mainUrl()."'/>\n".
-				"<input type='hidden' name='bvversion' value='".$this->bvinfo->version."'/>\n".
-	 			"<input type='hidden' name='serverip' value='".$_SERVER["SERVER_ADDR"]."'/>\n".
-				"<input type='hidden' name='abspath' value='".ABSPATH."'/>\n".
-				"<input type='hidden' name='secret' value='".$secret."'/>\n".
-				"<input type='hidden' name='public' value='".$public."'/>\n".
-				"<input type='hidden' name='bvnonce' value='".$bvnonce."'/>\n";
+		$secret = MCRecover::defaultSecret($this->settings);
+		$tags = "<input type='hidden' name='url' value='".esc_attr($this->siteinfo->wpurl())."'/>\n".
+				"<input type='hidden' name='homeurl' value='".esc_attr($this->siteinfo->homeurl())."'/>\n".
+				"<input type='hidden' name='siteurl' value='".esc_attr($this->siteinfo->siteurl())."'/>\n".
+				"<input type='hidden' name='dbsig' value='".esc_attr($this->siteinfo->dbsig(false))."'/>\n".
+				"<input type='hidden' name='plug' value='".esc_attr($this->bvinfo->plugname)."'/>\n".
+				"<input type='hidden' name='adminurl' value='".esc_attr($this->mainUrl())."'/>\n".
+				"<input type='hidden' name='bvversion' value='".esc_attr($this->bvinfo->version)."'/>\n".
+	 			"<input type='hidden' name='serverip' value='".esc_attr($_SERVER["SERVER_ADDR"])."'/>\n".
+				"<input type='hidden' name='abspath' value='".esc_attr(ABSPATH)."'/>\n".
+				"<input type='hidden' name='secret' value='".esc_attr($secret)."'/>\n".
+				"<input type='hidden' name='public' value='".esc_attr($public)."'/>\n".
+				"<input type='hidden' name='bvnonce' value='".esc_attr($bvnonce)."'/>\n";
 		return $tags;
 	}
 
@@ -179,7 +204,7 @@ class MCWPAdmin {
 		if (!MCAccount::isConfigured($this->settings) && $hook_suffix == 'index.php' ) {
 ?>
 			<div id="message" class="updated" style="padding: 8px; font-size: 16px; background-color: #dff0d8">
-						<a class="button-primary" href="<?php echo $this->mainUrl(); ?>">Activate MalCare</a>
+						<a class="button-primary" href="<?php echo esc_url($this->mainUrl()); ?>">Activate MalCare</a>
 						&nbsp;&nbsp;&nbsp;<b>Almost Done:</b> Activate your Malcare account to secure your site.
 			</div>
 <?php
@@ -187,8 +212,7 @@ class MCWPAdmin {
 	}
 
 	public function showAddAccountPage() {
-		$this->enqueueBootstrapCSS();
-		require_once dirname( __FILE__ ) . "/admin/registration.php";
+		require_once dirname( __FILE__ ) . "/admin/add_new_account.php";
 	}
 
 	public function showAccountDetailsPage() {
@@ -203,8 +227,8 @@ class MCWPAdmin {
 		if (isset($_REQUEST['bvnonce']) && wp_verify_nonce( $_REQUEST['bvnonce'], 'bvnonce' )) {
 			$info = array();
 			$this->siteinfo->basic($info);
-			$this->bvapi->pingbv('/bvapi/disconnect', $info, $_REQUEST['pubkey']);
-			MCAccount::remove($this->settings, $_REQUEST['pubkey']);
+			$this->bvapi->pingbv('/bvapi/disconnect', $info, MCAccount::sanitizeKey($_REQUEST['pubkey']));
+			MCAccount::remove($this->settings, MCAccount::sanitizeKey($_REQUEST['pubkey']));
 		}
 
 		if (isset($_REQUEST['account_details'])) {
@@ -227,28 +251,38 @@ class MCWPAdmin {
 
 		if ($this->bvinfo->canSetCWBranding()) {
 			$brand = $this->cwBrandInfo();
-			if (array_key_exists('name', $brand)) {
-				$plugins[$slug]['Name'] = $brand['name'];
-			}
-			if (array_key_exists('title', $brand)) {
-				$plugins[$slug]['Title'] = $brand['title'];
-			}
-			if (array_key_exists('description', $brand)) {
-				$plugins[$slug]['Description'] = $brand['description'];
-			}
-			if (array_key_exists('authoruri', $brand)) {
-				$plugins[$slug]['AuthorURI'] = $brand['authoruri'];
-			}
-			if (array_key_exists('author', $brand)) {
-				$plugins[$slug]['Author'] = $brand['author'];
-			}
-			if (array_key_exists('authorname', $brand)) {
-				$plugins[$slug]['AuthorName'] = $brand['authorname'];
-			}
-			if (array_key_exists('pluginuri', $brand)) {
-				$plugins[$slug]['PluginURI'] = $brand['pluginuri'];
+		} else {
+			$brand = $this->bvinfo->getBrandInfo();
+		}
+
+		if (is_array($brand)) {
+			if (array_key_exists('hide', $brand)) {
+				unset($plugins[$slug]);
+			} else {
+				if (array_key_exists('name', $brand)) {
+					$plugins[$slug]['Name'] = $brand['name'];
+				}
+				if (array_key_exists('title', $brand)) {
+					$plugins[$slug]['Title'] = $brand['title'];
+				}
+				if (array_key_exists('description', $brand)) {
+					$plugins[$slug]['Description'] = $brand['description'];
+				}
+				if (array_key_exists('authoruri', $brand)) {
+					$plugins[$slug]['AuthorURI'] = $brand['authoruri'];
+				}
+				if (array_key_exists('author', $brand)) {
+					$plugins[$slug]['Author'] = $brand['author'];
+				}
+				if (array_key_exists('authorname', $brand)) {
+					$plugins[$slug]['AuthorName'] = $brand['authorname'];
+				}
+				if (array_key_exists('pluginuri', $brand)) {
+					$plugins[$slug]['PluginURI'] = $brand['pluginuri'];
+				}
 			}
 		}
+
 		return $plugins;
 	}
 }
